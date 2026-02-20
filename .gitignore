@@ -33,3 +33,8 @@ coverage/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Node
+node_modules/
+*.tsbuildinfo
+src/Web/web-ui/dist/

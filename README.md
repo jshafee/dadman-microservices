@@ -1,6 +1,6 @@
 # Dadman Microservices Backend
 
-Backend-only .NET 10 microservices monorepo bootstrap.
+Backend-first .NET 10 microservices monorepo with a React SPA + Web BFF track.
 
 ## Repository Layout
 
@@ -9,15 +9,18 @@ Backend-only .NET 10 microservices monorepo bootstrap.
 - `src/Services` - domain microservices
 - `src/Workers` - background workers
 - `src/Bootstrap/Bootstrap.Api` - minimal bootstrap API placeholder
+- `src/Web/Web.Bff` - cookie-based Web BFF hosting the SPA in production
+- `src/Web/web-ui` - React + TypeScript + Vite SPA
 - `tests/Bootstrap.UnitTests` - bootstrap unit tests
 - `deploy/docker` - local infrastructure assets
-- `scripts` - local/CI scripts
+- `scripts` - local scripts
 - `docs/adr` - architecture decision records
 - `.github/workflows` - CI workflows
 
 ## Prerequisites
 
 - .NET SDK 10.0.103 (pinned by `global.json`)
+- Node.js 20+
 - Docker Desktop or Docker Engine with Compose plugin
 
 ## Run (bootstrap)
@@ -30,11 +33,36 @@ dotnet run --project src/Bootstrap/Bootstrap.Api
 curl http://localhost:5087/health
 ```
 
+## Run (Web BFF + UI)
+
+Production-style (serve SPA from Web.Bff):
+
+```powershell
+pwsh ./scripts/web-ui-build.ps1
+dotnet run --project src/Web/Web.Bff
+```
+
+Development (Vite proxy + BFF):
+
+```powershell
+pwsh ./scripts/web-dev.ps1
+```
+
+Vite proxies `/bff/*` requests to `http://localhost:5087`.
+
 ## Build and test
 
 ```bash
 dotnet build -c Release
 dotnet test -c Release
+```
+
+Web UI build:
+
+```bash
+cd src/Web/web-ui
+npm ci
+npm run build
 ```
 
 ## Infrastructure (docker compose)
@@ -66,12 +94,13 @@ pwsh ./scripts/infra-down.ps1
 
 ## CI
 
-GitHub Actions runs on every pull request and on pushes to `main`.
+GitHub Actions runs on pull requests and pushes to `main`.
 
 The workflow executes:
 
 ```bash
 dotnet restore
-dotnet build -c Release
-dotnet test -c Release
+dotnet build -c Release --no-restore
+dotnet test -c Release --no-build
+cd src/Web/web-ui && npm ci && npm run build
 ```
