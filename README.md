@@ -37,17 +37,26 @@ curl http://localhost:5087/health
 
 Production-style (serve SPA from Web.Bff):
 
-Windows (PowerShell):
+Windows:
+
+PowerShell 5.1:
 
 ```powershell
-pwsh ./scripts/web-ui-build.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\web-ui-build.ps1
 dotnet run --project src/Web/Web.Bff
 ```
 
-Linux/macOS (bash):
+PowerShell 7:
+
+```powershell
+pwsh .\scripts\web-ui-build.ps1
+dotnet run --project src/Web/Web.Bff
+```
+
+Linux/macOS:
 
 ```bash
-./scripts/web-ui-build.sh
+bash ./scripts/web-ui-build.sh
 dotnet run --project src/Web/Web.Bff
 ```
 
@@ -62,17 +71,17 @@ pwsh ./scripts/web-dev.ps1
 Linux/macOS (bash):
 
 ```bash
-./scripts/web-dev.sh
+bash ./scripts/web-dev.sh
 ```
 
-Vite proxies `/bff/*` requests to `http://localhost:5087`.
+Vite proxies `/bff/*` requests to `http://localhost:5087` (Vite default: `http://localhost:5173`, Web.Bff: `http://localhost:5087`).
 
 ## Web smoke check
 
 Run a lightweight non-Playwright smoke verification:
 
 ```bash
-./scripts/web-smoke.sh
+bash ./scripts/web-smoke.sh
 ```
 
 It verifies:
@@ -132,5 +141,5 @@ dotnet restore
 dotnet build -c Release --no-restore
 dotnet test -c Release --no-build
 cd src/Web/web-ui && npm ci && npm run build
-./scripts/web-smoke.sh
+bash ./scripts/web-smoke.sh
 ```
