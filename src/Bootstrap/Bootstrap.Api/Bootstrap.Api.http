@@ -1,0 +1,6 @@
+@BootstrapApiHost = http://localhost:5087
+
+GET {{BootstrapApiHost}}/health
+Accept: application/json
+
+###
