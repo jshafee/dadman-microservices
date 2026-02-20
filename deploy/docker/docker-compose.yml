@@ -6,7 +6,7 @@ services:
       MSSQL_SA_PASSWORD: ${SA_PASSWORD}
       SA_PASSWORD: ${SA_PASSWORD}
     ports:
-      - "${MSSQL_PORT:-1433}:1433"
+      - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
 
@@ -16,8 +16,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
-      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 
@@ -26,7 +26,7 @@ services:
     environment:
       ACCEPT_EULA: "Y"
     ports:
-      - "${SEQ_PORT:-5341}:80"
+      - "5341:80"
     volumes:
       - seq_data:/data
 
@@ -36,34 +36,30 @@ services:
     volumes:
       - ./otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
     ports:
-      - "${OTEL_GRPC_PORT:-4317}:4317"
-      - "${OTEL_HTTP_PORT:-4318}:4318"
-      - "${OTEL_PROMETHEUS_PORT:-9464}:9464"
+      - "4317:4317"
+      - "4318:4318"
+      - "9464:9464"
 
   jaeger:
     image: jaegertracing/all-in-one:latest
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
-      - "${JAEGER_UI_PORT:-16686}:16686"
-      - "${JAEGER_OTLP_GRPC_PORT:-4319}:4317"
-      - "${JAEGER_COLLECTOR_GRPC_PORT:-14250}:14250"
-      - "${JAEGER_COLLECTOR_HTTP_PORT:-14268}:14268"
+      - "16686:16686"
 
   prometheus:
     image: prom/prometheus:latest
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
+      - "9090:9090"
 
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "${GRAFANA_PORT:-3000}:3000"
+      - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
 

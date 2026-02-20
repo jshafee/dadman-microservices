@@ -105,14 +105,11 @@ npm run build
 
 ## Infrastructure (docker compose)
 
-Services in `deploy/docker/docker-compose.yml`:
-- SQL Server (`1433`)
-- RabbitMQ AMQP (`5672`) + Management UI (`15672`)
-- Seq (`5341`)
-- OpenTelemetry Collector OTLP gRPC (`4317`) + OTLP HTTP (`4318`) + Prometheus exporter (`9464`)
-- Jaeger UI (`16686`) + OTLP gRPC (`4319`) + collector gRPC (`14250`) + collector HTTP (`14268`)
-- Prometheus (`9090`)
-- Grafana (`3000`)
+Files under `deploy/docker`:
+- `docker-compose.yml`
+- `.env.example`
+- `otel-collector-config.yml`
+- `prometheus.yml`
 
 1) Create a local env file:
 
@@ -120,13 +117,13 @@ Services in `deploy/docker/docker-compose.yml`:
 cp deploy/docker/.env.example deploy/docker/.env
 ```
 
-2) Start stack (bash/direct):
+2) Start stack:
 
 ```bash
 docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env up -d
 ```
 
-3) Stop stack (bash/direct):
+3) Stop stack:
 
 ```bash
 docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env down -v
@@ -145,6 +142,17 @@ Linux/macOS helpers:
 bash ./scripts/infra-up.sh
 bash ./scripts/infra-down.sh
 ```
+
+Service URLs/ports:
+- SQL Server: `localhost:1433`
+- RabbitMQ AMQP: `localhost:5672`
+- RabbitMQ Management: http://localhost:15672
+- Seq: http://localhost:5341
+- OpenTelemetry Collector OTLP gRPC: `localhost:4317`
+- OpenTelemetry Collector OTLP HTTP: `localhost:4318`
+- Jaeger UI: http://localhost:16686
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
 
 ## CI
 
