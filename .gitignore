@@ -1,0 +1,40 @@
+# Build output
+bin/
+obj/
+out/
+
+# Test output
+TestResults/
+coverage/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.csproj.user
+*.userprefs
+
+# IDEs/editors
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and local env
+*.log
+.env
+.env.local
+
+# Docker
+**/.docker/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+*.tsbuildinfo
+src/Web/web-ui/dist/
