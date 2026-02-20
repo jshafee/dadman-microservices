@@ -47,6 +47,8 @@ services:
     ports:
       - "${JAEGER_UI_PORT:-16686}:16686"
       - "${JAEGER_OTLP_GRPC_PORT:-4319}:4317"
+      - "${JAEGER_COLLECTOR_GRPC_PORT:-14250}:14250"
+      - "${JAEGER_COLLECTOR_HTTP_PORT:-14268}:14268"
 
   prometheus:
     image: prom/prometheus:latest

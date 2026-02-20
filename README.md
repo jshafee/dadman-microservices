@@ -105,29 +105,45 @@ npm run build
 
 ## Infrastructure (docker compose)
 
+Services in `deploy/docker/docker-compose.yml`:
+- SQL Server (`1433`)
+- RabbitMQ AMQP (`5672`) + Management UI (`15672`)
+- Seq (`5341`)
+- OpenTelemetry Collector OTLP gRPC (`4317`) + OTLP HTTP (`4318`) + Prometheus exporter (`9464`)
+- Jaeger UI (`16686`) + OTLP gRPC (`4319`) + collector gRPC (`14250`) + collector HTTP (`14268`)
+- Prometheus (`9090`)
+- Grafana (`3000`)
+
 1) Create a local env file:
 
 ```bash
 cp deploy/docker/.env.example deploy/docker/.env
 ```
 
-2) Start stack:
+2) Start stack (bash/direct):
 
 ```bash
 docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env up -d
 ```
 
-3) Stop stack:
+3) Stop stack (bash/direct):
 
 ```bash
 docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env down -v
 ```
 
-Windows PowerShell helpers:
+Windows helpers:
 
 ```powershell
-pwsh ./scripts/infra-up.ps1
-pwsh ./scripts/infra-down.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\infra-up.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\infra-down.ps1
+```
+
+Linux/macOS helpers:
+
+```bash
+bash ./scripts/infra-up.sh
+bash ./scripts/infra-down.sh
 ```
 
 ## CI
