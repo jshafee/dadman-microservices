@@ -35,6 +35,9 @@ jobs:
       - name: Test
         run: dotnet test -c Release --no-build
 
+      - name: Web BFF smoke check
+        run: ./scripts/web-smoke.sh
+
       - name: Install web UI dependencies
         working-directory: src/Web/web-ui
         run: npm ci

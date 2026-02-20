@@ -37,18 +37,47 @@ curl http://localhost:5087/health
 
 Production-style (serve SPA from Web.Bff):
 
+Windows (PowerShell):
+
 ```powershell
 pwsh ./scripts/web-ui-build.ps1
 dotnet run --project src/Web/Web.Bff
 ```
 
+Linux/macOS (bash):
+
+```bash
+./scripts/web-ui-build.sh
+dotnet run --project src/Web/Web.Bff
+```
+
 Development (Vite proxy + BFF):
+
+Windows (PowerShell):
 
 ```powershell
 pwsh ./scripts/web-dev.ps1
 ```
 
+Linux/macOS (bash):
+
+```bash
+./scripts/web-dev.sh
+```
+
 Vite proxies `/bff/*` requests to `http://localhost:5087`.
+
+## Web smoke check
+
+Run a lightweight non-Playwright smoke verification:
+
+```bash
+./scripts/web-smoke.sh
+```
+
+It verifies:
+- `GET /` returns `200`
+- `GET /bff/me` returns `401` before login
 
 ## Build and test
 
@@ -103,4 +132,5 @@ dotnet restore
 dotnet build -c Release --no-restore
 dotnet test -c Release --no-build
 cd src/Web/web-ui && npm ci && npm run build
+./scripts/web-smoke.sh
 ```
