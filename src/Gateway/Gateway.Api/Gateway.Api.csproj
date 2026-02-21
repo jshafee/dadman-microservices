@@ -9,5 +9,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\BuildingBlocks.ServiceDefaults\BuildingBlocks.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\BuildingBlocks.Security\BuildingBlocks.Security.csproj" />
   </ItemGroup>
 </Project>
