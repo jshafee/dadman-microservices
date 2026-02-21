@@ -2,14 +2,31 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace BuildingBlocks.ServiceDefaults;
 
 public static class ServiceDefaultsExtensions
 {
-    public static IServiceCollection AddServiceDefaults(this IServiceCollection services)
+    public static IServiceCollection AddServiceDefaults(this IServiceCollection services, string? serviceName = null)
     {
         services.AddHealthChecks();
+
+        services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddService(serviceName ?? "dadman-service"))
+            .WithTracing(tracing => tracing
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSource("MassTransit")
+                .AddOtlpExporter())
+            .WithMetrics(metrics => metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddOtlpExporter());
+
         return services;
     }
 

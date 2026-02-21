@@ -111,7 +111,7 @@ Files under `deploy/docker`:
 - `otel-collector-config.yml`
 - `prometheus.yml`
 
-1) Create a local env file:
+1) Create a local env file (git-ignored) and set real secrets there:
 
 ```bash
 cp deploy/docker/.env.example deploy/docker/.env
@@ -148,11 +148,59 @@ Service URLs/ports:
 - RabbitMQ AMQP: `localhost:5672`
 - RabbitMQ Management: http://localhost:15672
 - Seq: http://localhost:5341
+
+Default local credentials are read from `deploy/docker/.env` (copied from `.env.example`).
+Set real values only in `deploy/docker/.env` (git-ignored) or environment variables. Never commit real credentials. Required values: `SA_PASSWORD` (or `MSSQL_SA_PASSWORD`), `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, and `SEQ_PASSWORD`.
 - OpenTelemetry Collector OTLP gRPC: `localhost:4317`
 - OpenTelemetry Collector OTLP HTTP: `localhost:4318`
 - Jaeger UI: http://localhost:16686
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000
+
+## Microservices Core Track (Catalog + Ordering + Gateway + Worker)
+
+Projects:
+- `src/Services/Catalog/*` (`Api`, `Application`, `Domain`, `Infrastructure`, `Contracts`)
+- `src/Services/Ordering/*` (`Api`, `Application`, `Domain`, `Infrastructure`, `Contracts`)
+- `src/Gateway/Gateway.Api` (YARP reverse proxy)
+- `src/Workers/Integration/Integration.Worker`
+
+Key implementation notes:
+- Catalog and Ordering each use a dedicated SQL Server database (`CatalogDb`, `OrderingDb`).
+- Both services use `BuildingBlocks.ServiceDefaults` for health (`/health`), correlation, request logging, and OTLP OpenTelemetry export (traces + metrics).
+- RabbitMQ is used for async integration via MassTransit.
+- Reliability uses MassTransit EF transactional outbox/inbox (`AddEntityFrameworkOutbox`, `UseEntityFrameworkOutbox`).
+- Service consumers use explicit MassTransit `ReceiveEndpoint(...)` queue names (no mixed auto-endpoint configuration) to avoid duplicate queues.
+- Gateway routes:
+  - `/catalog/*` -> `http://localhost:5101`
+  - `/ordering/*` -> `http://localhost:5102`
+
+Run services (separate terminals):
+
+```bash
+dotnet run --project src/Services/Catalog/Catalog.Api --launch-profile http
+dotnet run --project src/Services/Ordering/Ordering.Api --launch-profile http
+dotnet run --project src/Gateway/Gateway.Api --launch-profile http
+dotnet run --project src/Workers/Integration/Integration.Worker
+```
+
+Windows helper scripts:
+- `scripts/run-core-track.ps1` starts Catalog, Ordering, Gateway, and Worker in separate PowerShell windows.
+- `scripts/migrate-services.ps1` runs `dotnet tool restore`, loads `deploy/docker/.env`, builds `ConnectionStrings__*` values, then applies EF Core updates for Catalog and Ordering with `dotnet ef`.
+
+Health checks:
+- Catalog: `http://localhost:5101/health`
+- Ordering: `http://localhost:5102/health`
+- Gateway: `http://localhost:5100/health`
+
+Environment-variable first configuration (no secrets in repo):
+- `ConnectionStrings__CatalogDb`
+- `ConnectionStrings__OrderingDb`
+- `RabbitMq__Host`
+- `RabbitMq__Username`
+- `RabbitMq__Password`
+
+The checked-in service `appsettings.json` files use placeholder values only; override with environment variables (for example `RabbitMq__Password` and `ConnectionStrings__*`) in local/dev environments.
 
 ## CI
 
