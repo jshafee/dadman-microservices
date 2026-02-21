@@ -38,3 +38,7 @@ Thumbs.db
 node_modules/
 *.tsbuildinfo
 src/Web/web-ui/dist/
+
+# Local env files
+*.env
+deploy/docker/.env
