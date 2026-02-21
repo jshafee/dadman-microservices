@@ -174,6 +174,13 @@ Key implementation notes:
 - Gateway routes:
   - `/catalog/*` -> `http://localhost:5101`
   - `/ordering/*` -> `http://localhost:5102`
+- Gateway resiliency middlewares:
+  - Rate limiting policy `fixed` (per authenticated user `sub` or client IP): default 120 requests/minute, queue 20.
+  - Rate limiting policy `write` (stricter for `POST/PUT/PATCH/DELETE`): default 20 requests/minute, queue 5.
+  - Output cache policy `catalog-get`: caches safe catalog GET/HEAD proxy responses for 15 seconds and varies by `api-version` query value.
+  - `/health` remains outside proxy route policies (no route-level throttling/cache metadata applied).
+- Tuning: adjust limits/TTL in `src/Gateway/Gateway.Api/Program.cs` (`AddRateLimiter` and `AddOutputCache`) and route-policy bindings in `src/Gateway/Gateway.Api/appsettings.json` metadata.
+- Ordering write flow validates catalog item existence via a resilient outbound HTTP call from Ordering API to Catalog API before creating an order.
 
 Run services (separate terminals):
 
@@ -193,14 +200,35 @@ Health checks:
 - Ordering: `http://localhost:5102/health`
 - Gateway: `http://localhost:5100/health`
 
+
+API versioning and OpenAPI (Catalog + Ordering):
+- Endpoints use query-string API versioning via `api-version`.
+- Examples:
+  - `GET /catalog/items?api-version=1.0`
+  - `GET /catalog/items?api-version=2.0`
+  - `GET /ordering/orders?api-version=1.0`
+- OpenAPI JSON is exposed in development at:
+  - `/openapi/v1.json`
+  - `/openapi/v2.json`
+- OpenAPI endpoints are mapped with anonymous access so docs can be retrieved even when API auth is enabled.
+
 Environment-variable first configuration (no secrets in repo):
 - `ConnectionStrings__CatalogDb`
 - `ConnectionStrings__OrderingDb`
 - `RabbitMq__Host`
 - `RabbitMq__Username`
 - `RabbitMq__Password`
+- `Auth__Issuer`
+- `Auth__Audience`
+- `Auth__SigningKey`
+- `Services__Catalog__BaseUrl` (Ordering -> Catalog validation call target)
 
 The checked-in service `appsettings.json` files use placeholder values only; override with environment variables (for example `RabbitMq__Password` and `ConnectionStrings__*`) in local/dev environments.
+
+Auth baseline:
+- Gateway, Catalog, and Ordering validate JWT bearer tokens from the `Auth` configuration section (`Issuer`, `Audience`, `SigningKey`).
+- `Auth:SigningKey` in checked-in `appsettings.json` files is a placeholder; set a real value via environment variable (for example `Auth__SigningKey`) for real usage.
+- Use `src/Tools/DevJwt` to generate local development JWTs.
 
 ## CI
 
