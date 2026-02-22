@@ -38,6 +38,7 @@ Thumbs.db
 node_modules/
 *.tsbuildinfo
 src/Web/web-ui/dist/
+src/Web/web-ui/build/
 
 # Local env files
 *.env

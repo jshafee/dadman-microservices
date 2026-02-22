@@ -18,6 +18,17 @@ if (Test-Path $bffWwwroot) {
 }
 
 New-Item -ItemType Directory -Path $bffWwwroot | Out-Null
-Copy-Item -Recurse -Force (Join-Path $uiPath 'dist/*') $bffWwwroot
+
+$distPath = Join-Path $uiPath 'dist'
+$buildPath = Join-Path $uiPath 'build'
+if (Test-Path $distPath) {
+    Copy-Item -Recurse -Force (Join-Path $distPath '*') $bffWwwroot
+}
+elseif (Test-Path $buildPath) {
+    Copy-Item -Recurse -Force (Join-Path $buildPath '*') $bffWwwroot
+}
+else {
+    throw 'No dist/ or build/ output found after UI build.'
+}
 
 Write-Host "Web UI built and copied to $bffWwwroot"

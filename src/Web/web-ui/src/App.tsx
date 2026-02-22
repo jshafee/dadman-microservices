@@ -1,60 +1,40 @@
-import { useState } from 'react';
+import React from 'react';
 
-type MeResponse = {
-  name: string;
-  claims: Array<{ type: string; value: string }>;
-};
+//import Scss
+import './assets/scss/themes.scss';
 
-export function App() {
-  const [csrfToken, setCsrfToken] = useState<string>('');
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [message, setMessage] = useState<string>('');
+//imoprt Route
+import Route from './Routes';
 
-  const getToken = async () => {
-    const response = await fetch('/bff/antiforgery', { credentials: 'include' });
-    const data = await response.json();
-    setCsrfToken(data.token);
-  };
+// Import Firebase Configuration file
+// import { initFirebaseBackend } from "./helpers/firebase_helper";
 
-  const login = async () => {
-    await fetch('/bff/dev/login', { method: 'POST', credentials: 'include' });
-    setMessage('Logged in as dev user');
-  };
+// Fake Backend 
+import fakeBackend from "./helpers/AuthType/fakeBackend";
 
-  const loadMe = async () => {
-    const response = await fetch('/bff/me', { credentials: 'include' });
-    if (response.status === 401) {
-      setMessage('Unauthorized. Login first.');
-      setMe(null);
-      return;
-    }
+// Activating fake backend
+fakeBackend();
 
-    setMe(await response.json());
-  };
+// const firebaseConfig = {
+//   apiKey: process.env.REACT_APP_APIKEY,
+//   authDomain: process.env.REACT_APP_AUTHDOMAIN,
+//   databaseURL: process.env.REACT_APP_DATABASEURL,
+//   projectId: process.env.REACT_APP_PROJECTID,
+//   storageBucket: process.env.REACT_APP_STORAGEBUCKET,
+//   messagingSenderId: process.env.REACT_APP_MESSAGINGSENDERID,
+//   appId: process.env.REACT_APP_APPID,
+//   measurementId: process.env.REACT_APP_MEASUREMENTID,
+// };
 
-  const logout = async () => {
-    await fetch('/bff/logout', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'X-CSRF-TOKEN': csrfToken }
-    });
-    setMe(null);
-    setMessage('Logged out');
-  };
+// // init firebase backend
+// initFirebaseBackend(firebaseConfig);
 
+function App() {
   return (
-    <main style={{ fontFamily: 'sans-serif', margin: '2rem' }}>
-      <h1>Dadman Web BFF</h1>
-      <p>Cookie-authenticated Web BFF demo UI.</p>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <button onClick={getToken}>Get CSRF Token</button>
-        <button onClick={login}>Dev Login</button>
-        <button onClick={loadMe}>Load /bff/me</button>
-        <button onClick={logout} disabled={!csrfToken}>Logout</button>
-      </div>
-      {message && <p><strong>{message}</strong></p>}
-      <p>CSRF token: {csrfToken ? 'loaded' : 'not loaded'}</p>
-      <pre>{JSON.stringify(me, null, 2)}</pre>
-    </main>
+    <React.Fragment>
+      <Route />
+    </React.Fragment>
   );
 }
+
+export default App;
