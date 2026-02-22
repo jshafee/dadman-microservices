@@ -12,10 +12,10 @@ if [[ ! -f deploy/docker/.env ]]; then
 fi
 
 compose_files=(-f deploy/docker/docker-compose.yml)
+compose_files+=(-f deploy/docker/docker-compose.apps.yml)
 if [[ "$prod_mode" == "true" ]]; then
   compose_files+=(-f deploy/docker/docker-compose.prod.yml)
 fi
-compose_files+=(-f deploy/docker/docker-compose.apps.yml)
 
 echo "Validating compose configuration..."
 docker compose \

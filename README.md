@@ -194,8 +194,8 @@ Manual production-oriented compose invocation example:
 ```bash
 docker compose \
   -f deploy/docker/docker-compose.yml \
-  -f deploy/docker/docker-compose.prod.yml \
   -f deploy/docker/docker-compose.apps.yml \
+  -f deploy/docker/docker-compose.prod.yml \
   --env-file deploy/docker/.env \
   config
 ```
@@ -210,9 +210,9 @@ Admin UI overlay (optional):
 ```bash
 docker compose \
   -f deploy/docker/docker-compose.yml \
+  -f deploy/docker/docker-compose.apps.yml \
   -f deploy/docker/docker-compose.prod.yml \
   -f deploy/docker/docker-compose.admin.yml \
-  -f deploy/docker/docker-compose.apps.yml \
   --env-file deploy/docker/.env \
   up -d
 ```
@@ -232,8 +232,8 @@ Example (prod + secrets overlay):
 ```bash
 docker compose \
   -f deploy/docker/docker-compose.yml \
-  -f deploy/docker/docker-compose.prod.yml \
   -f deploy/docker/docker-compose.apps.yml \
+  -f deploy/docker/docker-compose.prod.yml \
   -f deploy/docker/docker-compose.secrets.yml \
   --env-file deploy/docker/.env \
   up -d --no-build
@@ -269,8 +269,8 @@ Production pull-only run (no local build):
 ```bash
 docker compose \
   -f deploy/docker/docker-compose.yml \
-  -f deploy/docker/docker-compose.prod.yml \
   -f deploy/docker/docker-compose.apps.yml \
+  -f deploy/docker/docker-compose.prod.yml \
   --env-file deploy/docker/.env \
   pull
 ```
@@ -280,8 +280,8 @@ docker compose \
 ```bash
 docker compose \
   -f deploy/docker/docker-compose.yml \
-  -f deploy/docker/docker-compose.prod.yml \
   -f deploy/docker/docker-compose.apps.yml \
+  -f deploy/docker/docker-compose.prod.yml \
   --env-file deploy/docker/.env \
   up -d --no-build
 ```

@@ -72,12 +72,12 @@ public static class ServiceDefaultsExtensions
         app.MapHealthChecks("/health/live", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains("live")
-        });
+        }).AllowAnonymous();
 
         app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains("ready")
-        });
+        }).AllowAnonymous();
 
         return app;
     }

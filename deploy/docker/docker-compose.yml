@@ -10,7 +10,7 @@ services:
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${SA_PASSWORD}\" -Q \"SELECT 1\" -C -b -o /dev/null"]
+      test: ["CMD-SHELL", "SQLCMD=/opt/mssql-tools18/bin/sqlcmd; if [ ! -x \"$SQLCMD\" ]; then SQLCMD=/opt/mssql-tools/bin/sqlcmd; fi; \"$SQLCMD\" -S localhost -U sa -P \"$${SA_PASSWORD}\" -Q \"SELECT 1\" -C -b -o /dev/null"]
       interval: 10s
       timeout: 5s
       retries: 12
