@@ -178,6 +178,8 @@ Linux/macOS (bash):
 ./scripts/apps-down.sh
 ```
 
+`apps-up` now starts infra, builds app images, runs Catalog + Ordering EF Core migrations via migrator tools, and then starts app services.
+
 App ports when full stack is running:
 - Gateway: `http://localhost:5100`
 - Catalog API: `http://localhost:5101`
@@ -278,12 +280,28 @@ API versioning and OpenAPI (Catalog + Ordering):
   - `GET /catalog/items?api-version=1.0`
   - `GET /catalog/items?api-version=2.0`
   - `GET /ordering/orders?api-version=1.0`
-- OpenAPI JSON is exposed in development at:
+- OpenAPI JSON is exposed when `ASPNETCORE_ENVIRONMENT=Development` at:
   - `/openapi/v1.json`
   - `/openapi/v2.json`
-- OpenAPI endpoints are mapped with anonymous access so docs can be retrieved even when API auth is enabled.
+- Docker Compose sets `ASPNETCORE_ENVIRONMENT=Docker`, so OpenAPI endpoints are **not** exposed in the compose stack by default.
+- OpenAPI endpoints are mapped with anonymous access in Development so docs can be retrieved even when API auth is enabled.
 
-Environment-variable first configuration (no secrets in repo):
+## Environment variables: Docker Compose vs .NET runtime
+
+Use the right variable names for your scenario:
+
+A) Docker Compose (`deploy/docker/.env`) variables used for compose interpolation:
+- `SA_PASSWORD` / `MSSQL_SA_PASSWORD`
+- `RABBITMQ_DEFAULT_USER`
+- `RABBITMQ_DEFAULT_PASS`
+- `SEQ_PASSWORD`
+- `GRAFANA_ADMIN_PASSWORD`
+- `AUTH_ISSUER`
+- `AUTH_AUDIENCE`
+- `AUTH_SIGNING_KEY`
+- `CATALOG_SERVICE_TOKEN`
+
+B) .NET runtime configuration environment variables (`dotnet run` / container runtime config):
 - `ConnectionStrings__CatalogDb`
 - `ConnectionStrings__OrderingDb`
 - `RabbitMq__Host`
@@ -294,12 +312,17 @@ Environment-variable first configuration (no secrets in repo):
 - `Auth__SigningKey`
 - `Services__Catalog__BaseUrl` (Ordering -> Catalog validation call target)
 - `Services__Catalog__ServiceToken` (machine token used by Ordering for Catalog validation calls)
+- `Seq__ServerUrl` (optional)
+- `Seq__ApiKey` (optional)
+- `OTEL_EXPORTER_OTLP_ENDPOINT`
 
-The checked-in service `appsettings.json` files use placeholder values only; override with environment variables (for example `RabbitMq__Password` and `ConnectionStrings__*`) in local/dev environments.
+In Docker Compose, `AUTH_*` and `CATALOG_SERVICE_TOKEN` from `.env` are mapped to the .NET runtime keys (for example `Auth__Issuer`, `Auth__SigningKey`, and `Services__Catalog__ServiceToken`) in compose service `environment` sections.
+
+The checked-in service `appsettings.json` files use placeholder values only; override with environment variables in local/dev environments.
 
 Auth baseline:
 - Gateway, Catalog, and Ordering validate JWT bearer tokens from the `Auth` configuration section (`Issuer`, `Audience`, `SigningKey`).
-- `Auth:SigningKey` in checked-in `appsettings.json` files is a placeholder; set a real value via environment variable (for example `Auth__SigningKey`) for real usage.
+- `Auth:SigningKey` in checked-in `appsettings.json` files is a placeholder; set a real value via environment variable (for example `Auth__SigningKey` for runtime configuration, or `AUTH_SIGNING_KEY` in compose `.env`).
 - Use `src/Tools/DevJwt` to generate local development JWTs.
 - Example dev service token (scope `catalog.read`) for `Services__Catalog__ServiceToken`:
 
@@ -307,10 +330,60 @@ Auth baseline:
 dotnet run --project src/Tools/DevJwt -- \
   --issuer "https://auth.local" \
   --audience "dadman-api" \
-  --key "$Auth__SigningKey" \
+  --key "$AUTH_SIGNING_KEY" \
   --sub "ordering-api" \
   --scopes "catalog.read" \
   --minutes 60
+```
+
+PowerShell equivalent:
+
+```powershell
+dotnet run --project src/Tools/DevJwt -- `
+  --issuer "https://auth.local" `
+  --audience "dadman-api" `
+  --key $Env:AUTH_SIGNING_KEY `
+  --sub "ordering-api" `
+  --scopes "catalog.read" `
+  --minutes 60
+```
+
+Example: run with `dotnet run` (bash):
+
+```bash
+export ConnectionStrings__CatalogDb="Server=localhost,1433;Database=CatalogDb;User Id=sa;Password=ChangeMe_StrongPassword;TrustServerCertificate=true"
+export ConnectionStrings__OrderingDb="Server=localhost,1433;Database=OrderingDb;User Id=sa;Password=ChangeMe_StrongPassword;TrustServerCertificate=true"
+export RabbitMq__Host="localhost"
+export RabbitMq__Username="admin"
+export RabbitMq__Password="ChangeMe_StrongPassword"
+export Auth__Issuer="https://auth.local"
+export Auth__Audience="dadman-api"
+export Auth__SigningKey="your-dev-signing-key"
+export Services__Catalog__BaseUrl="http://localhost:5101"
+export Services__Catalog__ServiceToken="$(dotnet run --project src/Tools/DevJwt -- --issuer https://auth.local --audience dadman-api --key your-dev-signing-key --sub ordering-api --scopes catalog.read --minutes 60)"
+```
+
+Example: run with `dotnet run` (PowerShell):
+
+```powershell
+$Env:ConnectionStrings__CatalogDb = "Server=localhost,1433;Database=CatalogDb;User Id=sa;Password=ChangeMe_StrongPassword;TrustServerCertificate=true"
+$Env:ConnectionStrings__OrderingDb = "Server=localhost,1433;Database=OrderingDb;User Id=sa;Password=ChangeMe_StrongPassword;TrustServerCertificate=true"
+$Env:RabbitMq__Host = "localhost"
+$Env:RabbitMq__Username = "admin"
+$Env:RabbitMq__Password = "ChangeMe_StrongPassword"
+$Env:Auth__Issuer = "https://auth.local"
+$Env:Auth__Audience = "dadman-api"
+$Env:Auth__SigningKey = "your-dev-signing-key"
+$Env:Services__Catalog__BaseUrl = "http://localhost:5101"
+$Env:Services__Catalog__ServiceToken = dotnet run --project src/Tools/DevJwt -- --issuer https://auth.local --audience dadman-api --key your-dev-signing-key --sub ordering-api --scopes catalog.read --minutes 60
+```
+
+Example: run with Docker Compose:
+
+```bash
+cp deploy/docker/.env.example deploy/docker/.env
+# edit deploy/docker/.env values (especially AUTH_SIGNING_KEY and CATALOG_SERVICE_TOKEN)
+./scripts/apps-up.sh
 ```
 
 

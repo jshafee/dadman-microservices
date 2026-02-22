@@ -37,7 +37,12 @@ public static class ServiceDefaultsExtensions
         app.Use(async (context, next) =>
         {
             var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? Guid.NewGuid().ToString("N");
-            context.Response.Headers["X-Correlation-ID"] = correlationId;
+            context.Request.Headers["X-Correlation-ID"] = correlationId;
+            context.Response.OnStarting(() =>
+            {
+                context.Response.Headers["X-Correlation-ID"] = correlationId;
+                return Task.CompletedTask;
+            });
             context.Items["CorrelationId"] = correlationId;
 
             var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();

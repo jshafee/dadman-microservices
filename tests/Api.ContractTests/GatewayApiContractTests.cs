@@ -99,6 +99,30 @@ public class GatewayApiContractTests
     }
 
     [Fact]
+    public async Task CatalogRead_FromCache_UsesCurrentRequestCorrelationId()
+    {
+        await using var host = GatewayTestHost.Create();
+
+        host.Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestJwt.Create("catalog.read"));
+
+        using var firstRequest = new HttpRequestMessage(HttpMethod.Get, "/catalog/items?api-version=1.0");
+        firstRequest.Headers.Add("X-Correlation-ID", "corr-1");
+        var first = await host.Client.SendAsync(firstRequest);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal("corr-1", first.Headers.GetValues("X-Correlation-ID").Single());
+        Assert.Equal("corr-1", host.LastCatalogReadForwardCorrelationId);
+
+        using var secondRequest = new HttpRequestMessage(HttpMethod.Get, "/catalog/items?api-version=1.0");
+        secondRequest.Headers.Add("X-Correlation-ID", "corr-2");
+        var second = await host.Client.SendAsync(secondRequest);
+
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal("corr-2", second.Headers.GetValues("X-Correlation-ID").Single());
+        Assert.Equal(1, host.CatalogReadForwardCount);
+    }
+
+    [Fact]
     public async Task UnauthorizedResponses_AreNotCached()
     {
         await using var host = GatewayTestHost.Create();
@@ -127,6 +151,7 @@ public class GatewayApiContractTests
 
         public HttpClient Client { get; }
         public int CatalogReadForwardCount => _gatewayFactory.CatalogReadForwardCount;
+        public string? LastCatalogReadForwardCorrelationId => _gatewayFactory.LastCatalogReadForwardCorrelationId;
 
         public static GatewayTestHost Create()
         {
@@ -156,6 +181,7 @@ public class GatewayApiContractTests
         private readonly TestForwarderHttpClientFactory _forwarderFactory = new(catalogFactory, orderingFactory);
 
         public int CatalogReadForwardCount => _forwarderFactory.CatalogReadForwardCount;
+        public string? LastCatalogReadForwardCorrelationId => _forwarderFactory.LastCatalogReadForwardCorrelationId;
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -214,14 +240,19 @@ public class GatewayApiContractTests
         private readonly HttpMessageInvoker _catalogInvoker;
         private readonly HttpMessageInvoker _orderingInvoker;
         private int _catalogReadForwardCount;
+        private string? _lastCatalogReadForwardCorrelationId;
 
         public TestForwarderHttpClientFactory(CatalogApiFactory catalogFactory, OrderingApiFactory orderingFactory)
         {
-            _catalogInvoker = new HttpMessageInvoker(new CountingHandler(catalogFactory.Server.CreateHandler(), () => Interlocked.Increment(ref _catalogReadForwardCount)));
+            _catalogInvoker = new HttpMessageInvoker(new CountingHandler(
+                catalogFactory.Server.CreateHandler(),
+                () => Interlocked.Increment(ref _catalogReadForwardCount),
+                correlationId => Volatile.Write(ref _lastCatalogReadForwardCorrelationId, correlationId)));
             _orderingInvoker = new HttpMessageInvoker(orderingFactory.Server.CreateHandler());
         }
 
         public int CatalogReadForwardCount => Volatile.Read(ref _catalogReadForwardCount);
+        public string? LastCatalogReadForwardCorrelationId => Volatile.Read(ref _lastCatalogReadForwardCorrelationId);
 
         public HttpMessageInvoker CreateClient(ForwarderHttpClientContext context)
         {
@@ -234,7 +265,10 @@ public class GatewayApiContractTests
         }
     }
 
-    private sealed class CountingHandler(HttpMessageHandler innerHandler, Action onCatalogReadForward) : DelegatingHandler(innerHandler)
+    private sealed class CountingHandler(
+        HttpMessageHandler innerHandler,
+        Action onCatalogReadForward,
+        Action<string?> onCatalogReadForwardCorrelationId) : DelegatingHandler(innerHandler)
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -244,6 +278,8 @@ public class GatewayApiContractTests
                 && request.RequestUri.Query.Contains("api-version=1.0", StringComparison.Ordinal))
             {
                 onCatalogReadForward();
+                request.Headers.TryGetValues("X-Correlation-ID", out var correlationHeaderValues);
+                onCatalogReadForwardCorrelationId(correlationHeaderValues?.SingleOrDefault());
             }
 
             return base.SendAsync(request, cancellationToken);

@@ -34,9 +34,7 @@ public static class DependencyInjection
         services.AddHttpClient<ICatalogClient, CatalogClient>((sp, client) =>
             {
                 var options = sp.GetRequiredService<IOptions<CatalogServiceOptions>>().Value;
-                var resilienceOptions = sp.GetRequiredService<IOptions<CatalogResilienceOptions>>().Value;
                 client.BaseAddress = new Uri(options.BaseUrl);
-                client.Timeout = TimeSpan.FromSeconds(resilienceOptions.TotalTimeoutSeconds);
             })
             .AddHttpMessageHandler<CorrelationIdPropagationHandler>()
             .AddHttpMessageHandler<ServiceTokenHandler>()
