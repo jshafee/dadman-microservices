@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1.7
 
+ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0
+ARG DOTNET_ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0
 ARG PROJECT
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM ${DOTNET_SDK_IMAGE} AS build
 ARG PROJECT
 WORKDIR /src
 
@@ -11,12 +13,20 @@ RUN test -n "$PROJECT"
 RUN dotnet restore "$PROJECT"
 RUN dotnet publish "$PROJECT" -c Release -o /app/publish --no-restore -p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM ${DOTNET_ASPNET_IMAGE} AS final
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 appgroup \
+    && useradd --uid 10001 --gid appgroup --home-dir /app --shell /usr/sbin/nologin --create-home appuser
 
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-COPY --from=build /app/publish .
+COPY --from=build --chown=10001:10001 /app/publish .
+
+USER 10001:10001
 
 ENTRYPOINT ["dotnet"]

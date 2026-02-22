@@ -23,6 +23,10 @@ var host = Host.CreateDefaultBuilder(args)
             loggerConfiguration.WriteTo.Seq(seqServerUrl, apiKey: seqApiKey);
         }
     })
+    .ConfigureAppConfiguration((_, configBuilder) =>
+    {
+        configBuilder.AddKeyPerFile("/run/secrets", optional: true);
+    })
     .ConfigureServices((context, services) =>
     {
         services.AddServiceDefaults("integration-worker");

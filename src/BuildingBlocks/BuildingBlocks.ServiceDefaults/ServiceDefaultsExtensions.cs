@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -12,7 +14,8 @@ public static class ServiceDefaultsExtensions
 {
     public static IServiceCollection AddServiceDefaults(this IServiceCollection services, string? serviceName = null)
     {
-        services.AddHealthChecks();
+        services.AddHealthChecks()
+            .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live", "ready"]);
 
         // Intentionally configure OpenTelemetry for traces + metrics only.
         // Logging is handled via Serilog/Seq in service entrypoints to avoid duplicate log pipelines.
@@ -66,7 +69,16 @@ public static class ServiceDefaultsExtensions
                 context.Items["CorrelationId"]);
         });
 
-        app.MapHealthChecks("/health");
+        app.MapHealthChecks("/health/live", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains("live")
+        });
+
+        app.MapHealthChecks("/health/ready", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains("ready")
+        });
+
         return app;
     }
 }

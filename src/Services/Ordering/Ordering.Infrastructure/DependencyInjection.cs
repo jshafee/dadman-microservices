@@ -2,6 +2,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using RabbitMQ.Client;
 using Microsoft.Extensions.Options;
 using Ordering.Application;
 
@@ -39,6 +40,33 @@ public static class DependencyInjection
             .AddHttpMessageHandler<CorrelationIdPropagationHandler>()
             .AddHttpMessageHandler<ServiceTokenHandler>()
             .AddCatalogResilience();
+
+
+        if (!useInMemory)
+        {
+            var rabbitMqHost = config["RabbitMq:Host"] ?? "localhost";
+            var rabbitMqUsername = config["RabbitMq:Username"] ?? "admin";
+            var rabbitMqPassword = config["RabbitMq:Password"] ?? "__SET_VIA_ENV__";
+            var rabbitMqConnectionString = $"amqp://{Uri.EscapeDataString(rabbitMqUsername)}:{Uri.EscapeDataString(rabbitMqPassword)}@{rabbitMqHost}:5672";
+
+            services.AddHealthChecks()
+                .AddSqlServer(
+                    connectionString: connectionString,
+                    name: "sqlserver",
+                    tags: ["ready"])
+                .AddRabbitMQ(
+                    _ =>
+                    {
+                        var factory = new ConnectionFactory
+                        {
+                            Uri = new Uri(rabbitMqConnectionString)
+                        };
+
+                        return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+                    },
+                    name: "rabbitmq",
+                    tags: ["ready"]);
+        }
 
         services.AddMassTransit(x =>
         {
