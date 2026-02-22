@@ -1,23 +1,43 @@
-using Integration.Worker;
 using BuildingBlocks.ServiceDefaults;
+using Integration.Worker;
 using MassTransit;
+using Serilog;
 
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.Services.AddServiceDefaults("integration-worker");
-builder.Services.AddMassTransit(x =>
-{
-    x.UsingRabbitMq((context, cfg) =>
+var host = Host.CreateDefaultBuilder(args)
+    .UseSerilog((context, _, loggerConfiguration) =>
     {
-        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
+        var seqServerUrl = context.Configuration["Seq:ServerUrl"];
+        var seqApiKey = context.Configuration["Seq:ApiKey"];
+
+        loggerConfiguration
+            .ReadFrom.Configuration(context.Configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithEnvironmentName()
+                .Enrich.WithProperty("service.name", "integration-worker")
+            .WriteTo.Console();
+
+        if (!string.IsNullOrWhiteSpace(seqServerUrl))
         {
-            h.Username(builder.Configuration["RabbitMq:Username"] ?? "admin");
-            h.Password(builder.Configuration["RabbitMq:Password"] ?? "__SET_VIA_ENV__");
+            loggerConfiguration.WriteTo.Seq(seqServerUrl, apiKey: seqApiKey);
+        }
+    })
+    .ConfigureServices((context, services) =>
+    {
+        services.AddServiceDefaults("integration-worker");
+        services.AddMassTransit(x =>
+        {
+            x.UsingRabbitMq((_, cfg) =>
+            {
+                cfg.Host(context.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
+                {
+                    h.Username(context.Configuration["RabbitMq:Username"] ?? "admin");
+                    h.Password(context.Configuration["RabbitMq:Password"] ?? "__SET_VIA_ENV__");
+                });
+            });
         });
-    });
-});
 
-builder.Services.AddHostedService<Worker>();
+        services.AddHostedService<Worker>();
+    })
+    .Build();
 
-var host = builder.Build();
 host.Run();

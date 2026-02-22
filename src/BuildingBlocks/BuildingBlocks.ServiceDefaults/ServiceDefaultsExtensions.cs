@@ -14,6 +14,8 @@ public static class ServiceDefaultsExtensions
     {
         services.AddHealthChecks();
 
+        // Intentionally configure OpenTelemetry for traces + metrics only.
+        // Logging is handled via Serilog/Seq in service entrypoints to avoid duplicate log pipelines.
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(serviceName ?? "dadman-service"))
             .WithTracing(tracing => tracing
@@ -37,7 +39,13 @@ public static class ServiceDefaultsExtensions
             var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? Guid.NewGuid().ToString("N");
             context.Response.Headers["X-Correlation-ID"] = correlationId;
             context.Items["CorrelationId"] = correlationId;
-            await next();
+
+            var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
+            var scopedLogger = loggerFactory.CreateLogger("CorrelationScope");
+            using (scopedLogger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = correlationId }))
+            {
+                await next();
+            }
         });
 
         app.Use(async (context, next) =>

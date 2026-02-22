@@ -10,8 +10,27 @@ using Catalog.Infrastructure;
 using MassTransit;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, _, loggerConfiguration) =>
+{
+    var seqServerUrl = context.Configuration["Seq:ServerUrl"];
+    var seqApiKey = context.Configuration["Seq:ApiKey"];
+
+    loggerConfiguration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithProperty("service.name", "catalog-api")
+        .WriteTo.Console();
+
+    if (!string.IsNullOrWhiteSpace(seqServerUrl))
+    {
+        loggerConfiguration.WriteTo.Seq(seqServerUrl, apiKey: seqApiKey);
+    }
+});
 
 builder.Services.AddServiceDefaults("catalog-api");
 builder.Services.AddJwtSecurity(builder.Configuration);
@@ -124,12 +143,15 @@ catalogWrite.MapPost("/items", async (
     })
     .MapToApiVersion(new ApiVersion(1, 0));
 
-catalogWrite.MapPost("/migrate", async (CatalogDbContext db, CancellationToken ct) =>
-    {
-        await db.Database.MigrateAsync(ct);
-        return Results.Ok();
-    })
-    .MapToApiVersion(new ApiVersion(1, 0));
+if (app.Environment.IsDevelopment())
+{
+    catalogWrite.MapPost("/migrate", async (CatalogDbContext db, CancellationToken ct) =>
+        {
+            await db.Database.MigrateAsync(ct);
+            return Results.Ok();
+        })
+        .MapToApiVersion(new ApiVersion(1, 0));
+}
 
 app.Run();
 

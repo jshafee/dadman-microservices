@@ -40,6 +40,7 @@ services:
       - "4317:4317"
       - "4318:4318"
       - "9464:9464"
+      - "13133:13133"
 
   jaeger:
     image: jaegertracing/all-in-one:latest
@@ -59,10 +60,14 @@ services:
 
   grafana:
     image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
     ports:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 
 volumes:
   sqlserver_data:

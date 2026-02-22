@@ -1,0 +1,22 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+**/coverage/
+
+# IDE / VCS
+.git/
+.vs/
+.idea/
+.vscode/
+
+# Node/web artifacts
+**/node_modules/
+src/Web/web-ui/dist/
+
+# Local docker/dev secrets
+deploy/docker/.env
+
+# Optional local volume-style folders under deploy/docker
+deploy/docker/volumes/

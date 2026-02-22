@@ -2,7 +2,6 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using Ordering.Application;
 
@@ -28,15 +27,20 @@ public static class DependencyInjection
         });
 
         services.Configure<CatalogServiceOptions>(config.GetSection(CatalogServiceOptions.SectionName));
+        services.Configure<CatalogResilienceOptions>(config.GetSection(CatalogResilienceOptions.SectionName));
         services.AddHttpContextAccessor();
-        services.AddTransient<AuthHeaderPropagationHandler>();
+        services.AddTransient<CorrelationIdPropagationHandler>();
+        services.AddTransient<ServiceTokenHandler>();
         services.AddHttpClient<ICatalogClient, CatalogClient>((sp, client) =>
             {
                 var options = sp.GetRequiredService<IOptions<CatalogServiceOptions>>().Value;
+                var resilienceOptions = sp.GetRequiredService<IOptions<CatalogResilienceOptions>>().Value;
                 client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(resilienceOptions.TotalTimeoutSeconds);
             })
-            .AddHttpMessageHandler<AuthHeaderPropagationHandler>()
-            .AddStandardResilienceHandler();
+            .AddHttpMessageHandler<CorrelationIdPropagationHandler>()
+            .AddHttpMessageHandler<ServiceTokenHandler>()
+            .AddCatalogResilience();
 
         services.AddMassTransit(x =>
         {
