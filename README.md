@@ -10,7 +10,8 @@ Backend-first .NET 10 microservices monorepo with a React SPA + Web BFF track.
 - `src/Workers` - background workers
 - `src/Bootstrap/Bootstrap.Api` - minimal bootstrap API placeholder
 - `src/Web/Web.Bff` - cookie-based Web BFF hosting the SPA in production
-- `src/Web/web-ui` - React + TypeScript + Vite SPA
+- `src/Web/web-ui` - curated React + TypeScript SPA workspace (feature-selected)
+- `src/Web/web-ui-template` - full imported Velzon template source (reference pool)
 - `tests/Bootstrap.UnitTests` - bootstrap unit tests
 - `deploy/docker` - local infrastructure assets
 - `scripts` - local scripts
