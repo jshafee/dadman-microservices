@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Serilog;
+using Serilog.Enrichers.Span;
+using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,7 @@ builder.Host.UseSerilog((context, _, loggerConfiguration) =>
         .ReadFrom.Configuration(context.Configuration)
         .Enrich.FromLogContext()
         .Enrich.WithEnvironmentName()
+        .Enrich.WithSpan()
         .Enrich.WithProperty("service.name", "gateway-api")
         .WriteTo.Console();
 
@@ -70,7 +73,24 @@ builder.Services.AddOutputCache(options =>
     options.AddPolicy("catalog-get", CatalogOutputCachePolicy.Instance);
 });
 
-builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .AddTransforms(builderContext =>
+    {
+        builderContext.AddRequestTransform(transformContext =>
+        {
+            var correlationId = transformContext.HttpContext.Items["CorrelationId"]?.ToString()
+                ?? transformContext.HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(correlationId))
+            {
+                transformContext.ProxyRequest.Headers.Remove("X-Correlation-ID");
+                transformContext.ProxyRequest.Headers.TryAddWithoutValidation("X-Correlation-ID", correlationId);
+            }
+
+            return ValueTask.CompletedTask;
+        });
+    });
 
 var app = builder.Build();
 app.UseServiceDefaults();

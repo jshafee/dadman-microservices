@@ -11,6 +11,7 @@ using MassTransit;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using Serilog.Enrichers.Span;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,7 @@ builder.Host.UseSerilog((context, _, loggerConfiguration) =>
         .ReadFrom.Configuration(context.Configuration)
         .Enrich.FromLogContext()
         .Enrich.WithEnvironmentName()
+        .Enrich.WithSpan()
         .Enrich.WithProperty("service.name", "catalog-api")
         .WriteTo.Console();
 

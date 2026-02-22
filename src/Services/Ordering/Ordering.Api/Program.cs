@@ -7,6 +7,7 @@ using MassTransit;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using Serilog.Enrichers.Span;
 using Ordering.Application;
 using Ordering.Contracts;
 using Ordering.Domain;
@@ -23,6 +24,7 @@ builder.Host.UseSerilog((context, _, loggerConfiguration) =>
         .ReadFrom.Configuration(context.Configuration)
         .Enrich.FromLogContext()
         .Enrich.WithEnvironmentName()
+        .Enrich.WithSpan()
         .Enrich.WithProperty("service.name", "ordering-api")
         .WriteTo.Console();
 

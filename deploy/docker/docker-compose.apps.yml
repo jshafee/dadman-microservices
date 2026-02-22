@@ -54,6 +54,35 @@ services:
       - seq
       - catalog-api
 
+
+  catalog-migrator:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Tools/Catalog.Migrator/Catalog.Migrator.csproj
+    command: ["Catalog.Migrator.dll"]
+    environment:
+      ConnectionStrings__CatalogDb: Server=sqlserver,1433;Database=CatalogDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      Seq__ServerUrl: http://seq:80
+    depends_on:
+      - sqlserver
+      - seq
+
+  ordering-migrator:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Tools/Ordering.Migrator/Ordering.Migrator.csproj
+    command: ["Ordering.Migrator.dll"]
+    environment:
+      ConnectionStrings__OrderingDb: Server=sqlserver,1433;Database=OrderingDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      Seq__ServerUrl: http://seq:80
+    depends_on:
+      - sqlserver
+      - seq
+
   gateway-api:
     build:
       context: ../..

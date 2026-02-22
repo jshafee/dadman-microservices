@@ -2,6 +2,7 @@ using BuildingBlocks.ServiceDefaults;
 using Integration.Worker;
 using MassTransit;
 using Serilog;
+using Serilog.Enrichers.Span;
 
 var host = Host.CreateDefaultBuilder(args)
     .UseSerilog((context, _, loggerConfiguration) =>
@@ -13,7 +14,8 @@ var host = Host.CreateDefaultBuilder(args)
             .ReadFrom.Configuration(context.Configuration)
             .Enrich.FromLogContext()
             .Enrich.WithEnvironmentName()
-                .Enrich.WithProperty("service.name", "integration-worker")
+            .Enrich.WithSpan()
+            .Enrich.WithProperty("service.name", "integration-worker")
             .WriteTo.Console();
 
         if (!string.IsNullOrWhiteSpace(seqServerUrl))
