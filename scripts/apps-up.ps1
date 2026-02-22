@@ -11,10 +11,10 @@ if (-not (Test-Path $envFile)) {
 
 $prodMode = $Prod -or ($env:COMPOSE_PROD -eq "true")
 $composeFiles = @("-f", "deploy/docker/docker-compose.yml")
+$composeFiles += @("-f", "deploy/docker/docker-compose.apps.yml")
 if ($prodMode) {
   $composeFiles += @("-f", "deploy/docker/docker-compose.prod.yml")
 }
-$composeFiles += @("-f", "deploy/docker/docker-compose.apps.yml")
 
 Write-Host "Validating compose configuration..."
 docker compose @composeFiles --env-file $envFile config | Out-Null

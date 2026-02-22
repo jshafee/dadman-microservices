@@ -3,7 +3,6 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using RabbitMQ.Client;
 
 namespace Catalog.Infrastructure;
 
@@ -34,21 +33,26 @@ public static class DependencyInjection
             var rabbitMqPassword = config["RabbitMq:Password"] ?? "__SET_VIA_ENV__";
             var rabbitMqConnectionString = $"amqp://{Uri.EscapeDataString(rabbitMqUsername)}:{Uri.EscapeDataString(rabbitMqPassword)}@{rabbitMqHost}:5672";
 
+            services.AddSingleton<RabbitMQ.Client.IConnection>(_ =>
+            {
+                var factory = new RabbitMQ.Client.ConnectionFactory
+                {
+                    Uri = new Uri(rabbitMqConnectionString),
+                    AutomaticRecoveryEnabled = true,
+                    TopologyRecoveryEnabled = true,
+                    NetworkRecoveryInterval = TimeSpan.FromSeconds(10),
+                    RequestedConnectionTimeout = TimeSpan.FromSeconds(10)
+                };
+
+                return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+            });
+
             services.AddHealthChecks()
                 .AddSqlServer(
                     connectionString: connectionString,
                     name: "sqlserver",
                     tags: ["ready"])
                 .AddRabbitMQ(
-                    _ =>
-                    {
-                        var factory = new ConnectionFactory
-                        {
-                            Uri = new Uri(rabbitMqConnectionString)
-                        };
-
-                        return factory.CreateConnectionAsync().GetAwaiter().GetResult();
-                    },
                     name: "rabbitmq",
                     tags: ["ready"]);
         }
