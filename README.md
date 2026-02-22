@@ -103,6 +103,24 @@ npm ci
 npm run build
 ```
 
+
+## Build .NET service container images (reusable Dockerfile)
+
+A single reusable Dockerfile is available at `deploy/docker/Dockerfile.dotnet`.
+
+Example builds from repository root:
+
+```bash
+docker build -f deploy/docker/Dockerfile.dotnet --build-arg PROJECT=src/Services/Catalog/Catalog.Api/Catalog.Api.csproj -t dadman/catalog-api .
+docker build -f deploy/docker/Dockerfile.dotnet --build-arg PROJECT=src/Services/Ordering/Ordering.Api/Ordering.Api.csproj -t dadman/ordering-api .
+docker build -f deploy/docker/Dockerfile.dotnet --build-arg PROJECT=src/Gateway/Gateway.Api/Gateway.Api.csproj -t dadman/gateway-api .
+docker build -f deploy/docker/Dockerfile.dotnet --build-arg PROJECT=src/Workers/Integration/Integration.Worker/Integration.Worker.csproj -t dadman/integration-worker .
+```
+
+Runtime notes:
+- Container port is `8080` (`ASPNETCORE_URLS=http://+:8080`).
+- Dockerfile uses `ENTRYPOINT ["dotnet"]`; set the service DLL via container command in compose/run.
+
 ## Infrastructure (docker compose)
 
 Files under `deploy/docker`:
@@ -143,6 +161,59 @@ bash ./scripts/infra-up.sh
 bash ./scripts/infra-down.sh
 ```
 
+
+Full stack (infra + apps) with Docker Compose:
+
+Windows (PowerShell):
+
+```powershell
+./scripts/apps-up.ps1
+./scripts/apps-down.ps1
+```
+
+Linux/macOS (bash):
+
+```bash
+./scripts/apps-up.sh
+./scripts/apps-down.sh
+```
+
+App ports when full stack is running:
+- Gateway: `http://localhost:5100`
+- Catalog API: `http://localhost:5101`
+- Ordering API: `http://localhost:5102`
+
+Quick smoke flow via gateway with a dev JWT:
+
+```bash
+TOKEN=$(dotnet run --project src/Tools/DevJwt -- \
+  --issuer "$AUTH_ISSUER" \
+  --audience "$AUTH_AUDIENCE" \
+  --key "$AUTH_SIGNING_KEY" \
+  --sub "dev-user" \
+  --scopes "catalog.read,ordering.write" \
+  --minutes 60)
+
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:5100/catalog/items?api-version=1.0"
+```
+
+
+Observability defaults in Docker stack:
+- Prometheus scrapes the OTEL Collector exporter at `otel-collector:9464`.
+- Grafana is pre-provisioned with:
+  - Prometheus datasource (`http://prometheus:9090`)
+  - Jaeger datasource (`http://jaeger:16686`)
+  - a "Targets Up" dashboard based on Prometheus `up` and `scrape_duration_seconds` metrics.
+- OTEL Collector health endpoint is available at `http://localhost:13133`.
+- Jaeger traces appear after calling APIs (for example via Gateway routes) with OTEL export enabled.
+- Logging uses Serilog + Seq as the primary log pipeline; OpenTelemetry logging export is intentionally not enabled to avoid duplicate log entries.
+
+
+Seq usage:
+- Open Seq at `http://localhost:5341`.
+- Filter by service with properties such as `service.name = "gateway-api"`, `service.name = "catalog-api"`, `service.name = "ordering-api"`, or `service.name = "integration-worker"`.
+- Correlation is attached via `CorrelationId` scope, and trace/span context is enriched when available.
+
 Service URLs/ports:
 - SQL Server: `localhost:1433`
 - RabbitMQ AMQP: `localhost:5672`
@@ -150,7 +221,7 @@ Service URLs/ports:
 - Seq: http://localhost:5341
 
 Default local credentials are read from `deploy/docker/.env` (copied from `.env.example`).
-Set real values only in `deploy/docker/.env` (git-ignored) or environment variables. Never commit real credentials. Required values: `SA_PASSWORD` (or `MSSQL_SA_PASSWORD`), `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, and `SEQ_PASSWORD`.
+Set real values only in `deploy/docker/.env` (git-ignored) or environment variables. Never commit real credentials. Required values: `SA_PASSWORD` (or `MSSQL_SA_PASSWORD`), `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `SEQ_PASSWORD`, and `GRAFANA_ADMIN_PASSWORD`.
 - OpenTelemetry Collector OTLP gRPC: `localhost:4317`
 - OpenTelemetry Collector OTLP HTTP: `localhost:4318`
 - Jaeger UI: http://localhost:16686
@@ -193,7 +264,7 @@ dotnet run --project src/Workers/Integration/Integration.Worker
 
 Windows helper scripts:
 - `scripts/run-core-track.ps1` starts Catalog, Ordering, Gateway, and Worker in separate PowerShell windows.
-- `scripts/migrate-services.ps1` runs `dotnet tool restore`, loads `deploy/docker/.env`, builds `ConnectionStrings__*` values, then applies EF Core updates for Catalog and Ordering with `dotnet ef`.
+- `scripts/migrate-services.ps1` (legacy helper) loads `deploy/docker/.env` and applies EF Core updates for Catalog and Ordering.
 
 Health checks:
 - Catalog: `http://localhost:5101/health`
@@ -222,6 +293,7 @@ Environment-variable first configuration (no secrets in repo):
 - `Auth__Audience`
 - `Auth__SigningKey`
 - `Services__Catalog__BaseUrl` (Ordering -> Catalog validation call target)
+- `Services__Catalog__ServiceToken` (machine token used by Ordering for Catalog validation calls)
 
 The checked-in service `appsettings.json` files use placeholder values only; override with environment variables (for example `RabbitMq__Password` and `ConnectionStrings__*`) in local/dev environments.
 
@@ -229,6 +301,71 @@ Auth baseline:
 - Gateway, Catalog, and Ordering validate JWT bearer tokens from the `Auth` configuration section (`Issuer`, `Audience`, `SigningKey`).
 - `Auth:SigningKey` in checked-in `appsettings.json` files is a placeholder; set a real value via environment variable (for example `Auth__SigningKey`) for real usage.
 - Use `src/Tools/DevJwt` to generate local development JWTs.
+- Example dev service token (scope `catalog.read`) for `Services__Catalog__ServiceToken`:
+
+```bash
+dotnet run --project src/Tools/DevJwt -- \
+  --issuer "https://auth.local" \
+  --audience "dadman-api" \
+  --key "$Auth__SigningKey" \
+  --sub "ordering-api" \
+  --scopes "catalog.read" \
+  --minutes 60
+```
+
+
+## EF Core migrations workflow (Catalog + Ordering)
+
+Standardized migration tooling uses `dotnet-ef` from the local tool manifest (`.config/dotnet-tools.json`).
+
+1) Restore local tools:
+
+```bash
+dotnet tool restore
+```
+
+2) Create a migration for both services:
+
+Windows (PowerShell):
+
+```powershell
+./scripts/ef-add-migration.ps1 InitialCreate
+```
+
+Linux/macOS (bash):
+
+```bash
+./scripts/ef-add-migration.sh InitialCreate
+```
+
+3) Apply migrations to databases:
+
+Set environment variables first (examples):
+
+```bash
+export ConnectionStrings__CatalogDb="Server=localhost,1433;Database=CatalogDb;User Id=sa;Password=<YOUR_PASSWORD>;TrustServerCertificate=true"
+export ConnectionStrings__OrderingDb="Server=localhost,1433;Database=OrderingDb;User Id=sa;Password=<YOUR_PASSWORD>;TrustServerCertificate=true"
+```
+
+Then run:
+
+Windows (PowerShell):
+
+```powershell
+./scripts/ef-update-db.ps1
+```
+
+Linux/macOS (bash):
+
+```bash
+./scripts/ef-update-db.sh
+```
+
+Docker compose usage:
+- Put real secrets only in `deploy/docker/.env` (git-ignored).
+- Export `ConnectionStrings__CatalogDb` and `ConnectionStrings__OrderingDb` from those values before running the update script.
+
+Commit migration code to source control; never commit real passwords or secret values.
 
 ## CI
 

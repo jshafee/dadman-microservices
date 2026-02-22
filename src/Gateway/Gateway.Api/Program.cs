@@ -1,9 +1,30 @@
 using BuildingBlocks.Security;
 using BuildingBlocks.ServiceDefaults;
+using Gateway.Api;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, _, loggerConfiguration) =>
+{
+    var seqServerUrl = context.Configuration["Seq:ServerUrl"];
+    var seqApiKey = context.Configuration["Seq:ApiKey"];
+
+    loggerConfiguration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithProperty("service.name", "gateway-api")
+        .WriteTo.Console();
+
+    if (!string.IsNullOrWhiteSpace(seqServerUrl))
+    {
+        loggerConfiguration.WriteTo.Seq(seqServerUrl, apiKey: seqApiKey);
+    }
+});
 
 builder.Services.AddServiceDefaults("gateway-api");
 builder.Services.AddJwtSecurity(builder.Configuration);
@@ -46,11 +67,7 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddOutputCache(options =>
 {
-    options.AddPolicy("catalog-get", policy => policy
-        .Expire(TimeSpan.FromSeconds(15))
-        .SetVaryByQuery("api-version")
-        .With(context => HttpMethods.IsGet(context.HttpContext.Request.Method)
-            && context.HttpContext.Request.Path.StartsWithSegments("/catalog")));
+    options.AddPolicy("catalog-get", CatalogOutputCachePolicy.Instance);
 });
 
 builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
@@ -61,7 +78,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.UseOutputCache();
-app.MapReverseProxy().RequireAuthorization();
+app.MapReverseProxy();
 app.Run();
 
 static string GetRateLimitPartitionKey(HttpContext context)
@@ -72,6 +89,19 @@ static string GetRateLimitPartitionKey(HttpContext context)
         return $"user:{subject}";
     }
 
+    var nameIdentifier = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (!string.IsNullOrWhiteSpace(nameIdentifier))
+    {
+        return $"user:{nameIdentifier}";
+    }
+
     var ipAddress = context.Connection.RemoteIpAddress?.ToString();
     return string.IsNullOrWhiteSpace(ipAddress) ? "ip:unknown" : $"ip:{ipAddress}";
+}
+
+public partial class Program { }
+
+namespace Gateway.Api
+{
+    public sealed class GatewayApiMarker { }
 }

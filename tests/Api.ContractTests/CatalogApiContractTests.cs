@@ -49,7 +49,46 @@ public class CatalogApiContractTests
     }
 
     [Fact]
-    public async Task OpenApiV1_ReturnsCatalogPath()
+    public async Task GetItems_WithoutApiVersion_UsesDefaultV1()
+    {
+        await using var factory = new CatalogApiFactory();
+        await factory.SeedAsync(new CatalogItem { Name = "Widget", Price = 10.50m });
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestJwt.Create("catalog.read"));
+
+        var defaultResponse = await client.GetAsync("/catalog/items");
+        var v1Response = await client.GetAsync("/catalog/items?api-version=1.0");
+
+        Assert.Equal(HttpStatusCode.OK, defaultResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, v1Response.StatusCode);
+
+        using var defaultDoc = JsonDocument.Parse(await defaultResponse.Content.ReadAsStringAsync());
+        using var v1Doc = JsonDocument.Parse(await v1Response.Content.ReadAsStringAsync());
+
+        var defaultItem = defaultDoc.RootElement[0];
+        var v1Item = v1Doc.RootElement[0];
+
+        Assert.False(defaultItem.TryGetProperty("displayName", out _));
+        Assert.False(v1Item.TryGetProperty("displayName", out _));
+        Assert.Equal(v1Item.GetProperty("name").GetString(), defaultItem.GetProperty("name").GetString());
+        Assert.Equal(v1Item.GetProperty("price").GetDecimal(), defaultItem.GetProperty("price").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GetItems_WithUnsupportedApiVersion_ReturnsClientError()
+    {
+        await using var factory = new CatalogApiFactory();
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TestJwt.Create("catalog.read"));
+
+        var response = await client.GetAsync("/catalog/items?api-version=9.9");
+
+        Assert.Contains(response.StatusCode, new[] { HttpStatusCode.BadRequest, HttpStatusCode.NotFound });
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OpenApiV1_IncludesV1Endpoints_AndExcludesV2OnlyShapes()
     {
         await using var factory = new CatalogApiFactory();
         var client = factory.CreateClient();
@@ -59,6 +98,22 @@ public class CatalogApiContractTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("/catalog/items", body);
+        Assert.DoesNotContain("displayName", body);
+    }
+
+    [Fact]
+    public async Task OpenApiV2_IncludesV2Endpoints_AndExcludesV1OnlyShapes()
+    {
+        await using var factory = new CatalogApiFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/openapi/v2.json");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("/catalog/items", body);
+        Assert.Contains("displayName", body);
+        Assert.DoesNotContain("CreateCatalogItemCommand", body);
     }
 
     [Fact]

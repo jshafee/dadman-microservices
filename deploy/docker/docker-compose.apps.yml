@@ -1,0 +1,101 @@
+services:
+  catalog-api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Services/Catalog/Catalog.Api/Catalog.Api.csproj
+    command: ["Catalog.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__CatalogDb: Server=sqlserver,1433;Database=CatalogDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    ports:
+      - "5101:8080"
+    depends_on:
+      - sqlserver
+      - rabbitmq
+      - otel-collector
+      - seq
+
+  ordering-api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Services/Ordering/Ordering.Api/Ordering.Api.csproj
+    command: ["Ordering.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__OrderingDb: Server=sqlserver,1433;Database=OrderingDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Services__Catalog__BaseUrl: http://catalog-api:8080
+      Services__Catalog__ServiceToken: ${CATALOG_SERVICE_TOKEN}
+      Seq__ServerUrl: http://seq:80
+    ports:
+      - "5102:8080"
+    depends_on:
+      - sqlserver
+      - rabbitmq
+      - otel-collector
+      - seq
+      - catalog-api
+
+  gateway-api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Gateway/Gateway.Api/Gateway.Api.csproj
+    command: ["Gateway.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      ReverseProxy__Clusters__catalog-cluster__Destinations__catalog__Address: http://catalog-api:8080
+      ReverseProxy__Clusters__ordering-cluster__Destinations__ordering__Address: http://ordering-api:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Seq__ServerUrl: http://seq:80
+    ports:
+      - "5100:8080"
+    depends_on:
+      - otel-collector
+      - seq
+      - catalog-api
+      - ordering-api
+
+  integration-worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Workers/Integration/Integration.Worker/Integration.Worker.csproj
+    command: ["Integration.Worker.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    depends_on:
+      - rabbitmq
+      - otel-collector
+      - seq

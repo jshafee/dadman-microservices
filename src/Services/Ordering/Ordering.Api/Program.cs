@@ -6,12 +6,31 @@ using BuildingBlocks.Validation;
 using MassTransit;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using Ordering.Application;
 using Ordering.Contracts;
 using Ordering.Domain;
 using Ordering.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, _, loggerConfiguration) =>
+{
+    var seqServerUrl = context.Configuration["Seq:ServerUrl"];
+    var seqApiKey = context.Configuration["Seq:ApiKey"];
+
+    loggerConfiguration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithProperty("service.name", "ordering-api")
+        .WriteTo.Console();
+
+    if (!string.IsNullOrWhiteSpace(seqServerUrl))
+    {
+        loggerConfiguration.WriteTo.Seq(seqServerUrl, apiKey: seqApiKey);
+    }
+});
 
 builder.Services.AddServiceDefaults("ordering-api");
 builder.Services.AddJwtSecurity(builder.Configuration);
@@ -106,12 +125,15 @@ orderingWrite.MapPost("/orders", async (
     })
     .MapToApiVersion(new ApiVersion(1, 0));
 
-orderingWrite.MapPost("/migrate", async (OrderingDbContext db, CancellationToken ct) =>
-    {
-        await db.Database.MigrateAsync(ct);
-        return Results.Ok();
-    })
-    .MapToApiVersion(new ApiVersion(1, 0));
+if (app.Environment.IsDevelopment())
+{
+    orderingWrite.MapPost("/migrate", async (OrderingDbContext db, CancellationToken ct) =>
+        {
+            await db.Database.MigrateAsync(ct);
+            return Results.Ok();
+        })
+        .MapToApiVersion(new ApiVersion(1, 0));
+}
 
 app.Run();
 
