@@ -1,0 +1,91 @@
+name: Docker Images
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+jobs:
+  build-push-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: catalog-api
+            project: src/Services/Catalog/Catalog.Api/Catalog.Api.csproj
+          - service: ordering-api
+            project: src/Services/Ordering/Ordering.Api/Ordering.Api.csproj
+          - service: gateway-api
+            project: src/Gateway/Gateway.Api/Gateway.Api.csproj
+          - service: integration-worker
+            project: src/Workers/Integration/Integration.Worker/Integration.Worker.csproj
+          - service: catalog-migrator
+            project: src/Tools/Catalog.Migrator/Catalog.Migrator.csproj
+          - service: ordering-migrator
+            project: src/Tools/Ordering.Migrator/Ordering.Migrator.csproj
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image metadata
+        id: meta
+        shell: bash
+        run: |
+          OWNER_LC="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          REPO_NAME="${{ github.event.repository.name }}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            IMAGE_TAG="${GITHUB_REF_NAME}"
+          else
+            IMAGE_TAG="manual-${GITHUB_RUN_NUMBER}"
+          fi
+          SHA_TAG="${GITHUB_SHA}"
+          IMAGE_BASE="ghcr.io/${OWNER_LC}/${REPO_NAME}/${{ matrix.service }}"
+          echo "image_base=${IMAGE_BASE}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.dotnet
+          build-args: |
+            PROJECT=${{ matrix.project }}
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_base }}:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.meta.outputs.image_base }}:${{ steps.meta.outputs.sha_tag }}
+
+      - name: Run Trivy scan for ${{ matrix.service }}
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ steps.meta.outputs.image_base }}:${{ steps.meta.outputs.sha_tag }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL
+          exit-code: '1'
+
+      - name: Upload Trivy SARIF for ${{ matrix.service }}
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}

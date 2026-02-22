@@ -1,14 +1,20 @@
 using BuildingBlocks.Security;
 using BuildingBlocks.ServiceDefaults;
 using Gateway.Api;
+using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Security.Claims;
-using System.Threading.RateLimiting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Serilog;
 using Serilog.Enrichers.Span;
+using StackExchange.Redis;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 
 builder.Host.UseSerilog((context, _, loggerConfiguration) =>
 {
@@ -30,6 +36,9 @@ builder.Host.UseSerilog((context, _, loggerConfiguration) =>
 });
 
 builder.Services.AddServiceDefaults("gateway-api");
+
+ConfigureForwardedHeaders(builder.Services, builder.Configuration);
+
 builder.Services.AddJwtSecurity(builder.Configuration);
 builder.Services.AddRateLimiter(options =>
 {
@@ -73,6 +82,8 @@ builder.Services.AddOutputCache(options =>
     options.AddPolicy("catalog-get", CatalogOutputCachePolicy.Instance);
 });
 
+ConfigureRedisOutputCache(builder.Services, builder.Configuration);
+
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
     .AddTransforms(builderContext =>
@@ -93,6 +104,11 @@ builder.Services.AddReverseProxy()
     });
 
 var app = builder.Build();
+if (IsForwardedHeadersEnabled(app.Configuration))
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseServiceDefaults();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -100,6 +116,48 @@ app.UseRateLimiter();
 app.UseOutputCache();
 app.MapReverseProxy();
 app.Run();
+
+static void ConfigureRedisOutputCache(IServiceCollection services, IConfiguration configuration)
+{
+    var redisConnectionString = configuration["REDIS_CONNECTIONSTRING"]
+        ?? configuration["Redis:ConnectionString"];
+
+    if (string.IsNullOrWhiteSpace(redisConnectionString))
+    {
+        return;
+    }
+
+    services.AddSingleton<IConnectionMultiplexer>(_ =>
+    {
+        var options = ConfigurationOptions.Parse(redisConnectionString, true);
+        options.AbortOnConnectFail = false;
+        options.ConnectRetry = 3;
+        options.ConnectTimeout = 2000;
+        return ConnectionMultiplexer.Connect(options);
+    });
+
+    services.Replace(ServiceDescriptor.Singleton<IOutputCacheStore, RedisOutputCacheStore>());
+}
+
+static void ConfigureForwardedHeaders(IServiceCollection services, IConfiguration configuration)
+{
+    if (!IsForwardedHeadersEnabled(configuration))
+    {
+        return;
+    }
+
+    services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+        // Trust all proxies/networks when explicitly enabled. Use only behind trusted reverse proxies.
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
+
+static bool IsForwardedHeadersEnabled(IConfiguration configuration)
+    => bool.TryParse(configuration["ForwardedHeaders:Enabled"] ?? configuration["ForwardedHeaders__Enabled"], out var enabled) && enabled;
 
 static string GetRateLimitPartitionKey(HttpContext context)
 {

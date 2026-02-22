@@ -15,6 +15,8 @@ using Ordering.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
 builder.Host.UseSerilog((context, _, loggerConfiguration) =>
 {
     var seqServerUrl = context.Configuration["Seq:ServerUrl"];

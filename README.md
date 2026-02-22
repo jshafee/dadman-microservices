@@ -125,6 +125,9 @@ Runtime notes:
 
 Files under `deploy/docker`:
 - `docker-compose.yml`
+- `docker-compose.prod.yml`
+- `docker-compose.admin.yml`
+- `docker-compose.secrets.yml`
 - `.env.example`
 - `otel-collector-config.yml`
 - `prometheus.yml`
@@ -168,6 +171,7 @@ Windows (PowerShell):
 
 ```powershell
 ./scripts/apps-up.ps1
+./scripts/apps-up.ps1 -Prod
 ./scripts/apps-down.ps1
 ```
 
@@ -175,10 +179,123 @@ Linux/macOS (bash):
 
 ```bash
 ./scripts/apps-up.sh
+./scripts/apps-up.sh --prod
 ./scripts/apps-down.sh
 ```
 
 `apps-up` now starts infra, builds app images, runs Catalog + Ordering EF Core migrations via migrator tools, and then starts app services.
+
+Compose healthchecks are enabled for infra and HTTP APIs; app `depends_on` requires core dependencies (SQL Server/RabbitMQ and service-to-service dependencies) to be healthy, while observability dependencies (OTEL Collector/Seq) are gated with `condition: service_started` so temporary observability startup issues do not block core service startup. `integration-worker` is treated as a non-HTTP worker and relies on dependency gating (RabbitMQ healthy + OTEL/Seq started) rather than its own HTTP probe.
+Use production mode (`--prod` / `-Prod`, or `COMPOSE_PROD=true`) to include `docker-compose.prod.yml`, which pins container and .NET base image versions.
+
+Manual production-oriented compose invocation example:
+
+```bash
+docker compose \
+  -f deploy/docker/docker-compose.yml \
+  -f deploy/docker/docker-compose.prod.yml \
+  -f deploy/docker/docker-compose.apps.yml \
+  --env-file deploy/docker/.env \
+  config
+```
+
+Production network/port defaults:
+- `docker-compose.prod.yml` attaches services to an internal `private` network and exposes only `gateway-api` (`5100`) by default.
+- Infra/service ports (SQL Server, RabbitMQ AMQP/UI, Seq, OTEL, Jaeger, Prometheus, Grafana, service APIs) are not host-published in prod overlay.
+- Long-running services use `restart: unless-stopped` for host reboot/crash recovery.
+
+Admin UI overlay (optional):
+
+```bash
+docker compose \
+  -f deploy/docker/docker-compose.yml \
+  -f deploy/docker/docker-compose.prod.yml \
+  -f deploy/docker/docker-compose.admin.yml \
+  -f deploy/docker/docker-compose.apps.yml \
+  --env-file deploy/docker/.env \
+  up -d
+```
+
+Use the admin overlay only for trusted/operator access when you need host access to observability or RabbitMQ management UIs.
+
+
+
+### Optional secrets-from-files overlay (production)
+
+Gateway, Catalog, Ordering, and Integration Worker support loading configuration from files in `/run/secrets` via `.AddKeyPerFile("/run/secrets", optional: true)`.
+
+Use `deploy/docker/docker-compose.secrets.yml` only in production-like deployments when running with Docker/Kubernetes secrets. It is optional and does **not** change default env-var behavior.
+
+Example (prod + secrets overlay):
+
+```bash
+docker compose \
+  -f deploy/docker/docker-compose.yml \
+  -f deploy/docker/docker-compose.prod.yml \
+  -f deploy/docker/docker-compose.apps.yml \
+  -f deploy/docker/docker-compose.secrets.yml \
+  --env-file deploy/docker/.env \
+  up -d --no-build
+```
+
+Secret files can be provided by default placeholders under `deploy/docker/secrets/*.example` or overridden with env vars:
+- `AUTH_SIGNING_KEY_FILE`
+- `RABBITMQ_USERNAME_FILE`
+- `RABBITMQ_PASSWORD_FILE`
+- `CATALOG_SERVICE_TOKEN_FILE`
+
+When using secrets files, keep env vars as fallback/compatibility; file-based keys are intended for production secret management.
+
+### Container image CI/CD (GHCR + Trivy)
+
+A GitHub Actions workflow (`.github/workflows/docker-images.yml`) builds and pushes service images when you push a release tag (`v*.*.*`) or trigger it manually.
+
+Workflow behavior:
+- Builds and pushes `catalog-api`, `ordering-api`, `gateway-api`, `integration-worker`, `catalog-migrator`, and `ordering-migrator`.
+- Uses `deploy/docker/Dockerfile.dotnet` with per-service `PROJECT` build args.
+- Pushes tags to GHCR:
+  - `ghcr.io/<owner>/<repo>/<service>:<git-tag-or-manual-tag>`
+  - `ghcr.io/<owner>/<repo>/<service>:<git-sha>`
+- Scans pushed images with Trivy (CRITICAL only) and uploads SARIF results to GitHub Security.
+
+Production pull-only run (no local build):
+1. Set image coordinates/tags in `deploy/docker/.env`:
+   - `GHCR_OWNER=<github-owner>`
+   - `GHCR_REPOSITORY=<github-repo>`
+   - `DADMAN_IMAGE_TAG=<release-tag>` (for example `v1.2.3`)
+2. Pull images:
+
+```bash
+docker compose \
+  -f deploy/docker/docker-compose.yml \
+  -f deploy/docker/docker-compose.prod.yml \
+  -f deploy/docker/docker-compose.apps.yml \
+  --env-file deploy/docker/.env \
+  pull
+```
+
+3. Start using pulled images only:
+
+```bash
+docker compose \
+  -f deploy/docker/docker-compose.yml \
+  -f deploy/docker/docker-compose.prod.yml \
+  -f deploy/docker/docker-compose.apps.yml \
+  --env-file deploy/docker/.env \
+  up -d --no-build
+```
+
+### Version pinning policy
+
+- `:latest` and other floating tags are forbidden for production compose runs.
+- `deploy/docker/docker-compose.prod.yml` pins infrastructure images to explicit versions and also pins `.NET` SDK/runtime base images for service builds.
+- Development compose files may stay more flexible, but production deployments must always include the prod overlay.
+- Production exposure defaults to gateway-only; use `docker-compose.admin.yml` only when operator UI access is required.
+- Update process for pinned versions:
+  1. Update the specific tag(s) in `docker-compose.prod.yml`.
+  2. Run `docker compose ... config` with the prod overlay.
+  3. Run `dotnet build -c Release` and `dotnet test -c Release`.
+  4. Roll forward in small increments and validate in non-production before release.
 
 App ports when full stack is running:
 - Gateway: `http://localhost:5100`
@@ -223,7 +340,7 @@ Service URLs/ports:
 - Seq: http://localhost:5341
 
 Default local credentials are read from `deploy/docker/.env` (copied from `.env.example`).
-Set real values only in `deploy/docker/.env` (git-ignored) or environment variables. Never commit real credentials. Required values: `SA_PASSWORD` (or `MSSQL_SA_PASSWORD`), `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `SEQ_PASSWORD`, and `GRAFANA_ADMIN_PASSWORD`.
+Set real values only in `deploy/docker/.env` (git-ignored) or environment variables. Never commit real credentials. Required values: `SA_PASSWORD` (or `MSSQL_SA_PASSWORD`), `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `SEQ_PASSWORD`, and `GRAFANA_ADMIN_PASSWORD`. Also set `REDIS_CONNECTIONSTRING` (default `redis:6379`) for distributed gateway output caching.
 - OpenTelemetry Collector OTLP gRPC: `localhost:4317`
 - OpenTelemetry Collector OTLP HTTP: `localhost:4318`
 - Jaeger UI: http://localhost:16686
@@ -240,7 +357,7 @@ Projects:
 
 Key implementation notes:
 - Catalog and Ordering each use a dedicated SQL Server database (`CatalogDb`, `OrderingDb`).
-- Both services use `BuildingBlocks.ServiceDefaults` for health (`/health`), correlation, request logging, and OTLP OpenTelemetry export (traces + metrics).
+- Both services use `BuildingBlocks.ServiceDefaults` for health (`/health/live` liveness and `/health/ready` readiness), correlation, request logging, and OTLP OpenTelemetry export (traces + metrics).
 - RabbitMQ is used for async integration via MassTransit.
 - Reliability uses MassTransit EF transactional outbox/inbox (`AddEntityFrameworkOutbox`, `UseEntityFrameworkOutbox`).
 - Service consumers use explicit MassTransit `ReceiveEndpoint(...)` queue names (no mixed auto-endpoint configuration) to avoid duplicate queues.
@@ -250,9 +367,14 @@ Key implementation notes:
 - Gateway resiliency middlewares:
   - Rate limiting policy `fixed` (per authenticated user `sub` or client IP): default 120 requests/minute, queue 20.
   - Rate limiting policy `write` (stricter for `POST/PUT/PATCH/DELETE`): default 20 requests/minute, queue 5.
-  - Output cache policy `catalog-get`: caches safe catalog GET/HEAD proxy responses for 15 seconds and varies by `api-version` query value.
-  - `/health` remains outside proxy route policies (no route-level throttling/cache metadata applied).
+  - Output cache policy `catalog-get`: caches safe catalog GET/HEAD proxy responses for 15 seconds, varies by `api-version`, and also varies by authenticated subject.
+- Gateway output cache storage uses Redis (`REDIS_CONNECTIONSTRING`) so multiple gateway replicas share cache entries.
+  - `/health/live` and `/health/ready` remain outside proxy route policies (no route-level throttling/cache metadata applied).
 - Tuning: adjust limits/TTL in `src/Gateway/Gateway.Api/Program.cs` (`AddRateLimiter` and `AddOutputCache`) and route-policy bindings in `src/Gateway/Gateway.Api/appsettings.json` metadata.
+- Gateway forwarded headers (for upstream TLS termination / real client IP):
+  - Set `ForwardedHeaders__Enabled=true` (or `ForwardedHeaders:Enabled=true`) to trust `X-Forwarded-For` and `X-Forwarded-Proto`.
+  - Enable this only when Gateway is behind a trusted reverse proxy/load balancer.
+  - Do **not** enable forwarded headers when Gateway is directly Internet-exposed without a trusted upstream proxy.
 - Ordering write flow validates catalog item existence via a resilient outbound HTTP call from Ordering API to Catalog API before creating an order.
 
 Run services (separate terminals):
@@ -269,9 +391,12 @@ Windows helper scripts:
 - `scripts/migrate-services.ps1` (legacy helper) loads `deploy/docker/.env` and applies EF Core updates for Catalog and Ordering.
 
 Health checks:
-- Catalog: `http://localhost:5101/health`
-- Ordering: `http://localhost:5102/health`
-- Gateway: `http://localhost:5100/health`
+- Catalog liveness: `http://localhost:5101/health/live`
+- Catalog readiness: `http://localhost:5101/health/ready`
+- Ordering liveness: `http://localhost:5102/health/live`
+- Ordering readiness: `http://localhost:5102/health/ready`
+- Gateway liveness: `http://localhost:5100/health/live`
+- Gateway readiness: `http://localhost:5100/health/ready`
 
 
 API versioning and OpenAPI (Catalog + Ordering):

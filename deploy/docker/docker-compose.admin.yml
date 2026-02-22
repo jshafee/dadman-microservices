@@ -1,0 +1,20 @@
+services:
+  seq:
+    ports:
+      - "5341:80"
+
+  jaeger:
+    ports:
+      - "16686:16686"
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  grafana:
+    ports:
+      - "3000:3000"
+
+  rabbitmq:
+    ports:
+      - "15672:15672"

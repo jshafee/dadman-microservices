@@ -1,5 +1,6 @@
 services:
   catalog-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/catalog-api:${DADMAN_IMAGE_TAG:-dev}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.dotnet
@@ -19,13 +20,24 @@ services:
       Seq__ServerUrl: http://seq:80
     ports:
       - "5101:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     depends_on:
-      - sqlserver
-      - rabbitmq
-      - otel-collector
-      - seq
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      seq:
+        condition: service_started
 
   ordering-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/ordering-api:${DADMAN_IMAGE_TAG:-dev}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.dotnet
@@ -47,15 +59,26 @@ services:
       Seq__ServerUrl: http://seq:80
     ports:
       - "5102:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     depends_on:
-      - sqlserver
-      - rabbitmq
-      - otel-collector
-      - seq
-      - catalog-api
-
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      seq:
+        condition: service_started
+      catalog-api:
+        condition: service_healthy
 
   catalog-migrator:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/catalog-migrator:${DADMAN_IMAGE_TAG:-dev}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.dotnet
@@ -66,10 +89,11 @@ services:
       ConnectionStrings__CatalogDb: Server=sqlserver,1433;Database=CatalogDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
       Seq__ServerUrl: http://seq:80
     depends_on:
-      - sqlserver
-      - seq
+      sqlserver:
+        condition: service_healthy
 
   ordering-migrator:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/ordering-migrator:${DADMAN_IMAGE_TAG:-dev}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.dotnet
@@ -80,10 +104,11 @@ services:
       ConnectionStrings__OrderingDb: Server=sqlserver,1433;Database=OrderingDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
       Seq__ServerUrl: http://seq:80
     depends_on:
-      - sqlserver
-      - seq
+      sqlserver:
+        condition: service_healthy
 
   gateway-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/gateway-api:${DADMAN_IMAGE_TAG:-dev}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.dotnet
@@ -99,15 +124,27 @@ services:
       ReverseProxy__Clusters__ordering-cluster__Destinations__ordering__Address: http://ordering-api:8080
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       Seq__ServerUrl: http://seq:80
+      REDIS_CONNECTIONSTRING: ${REDIS_CONNECTIONSTRING}
     ports:
       - "5100:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     depends_on:
-      - otel-collector
-      - seq
-      - catalog-api
-      - ordering-api
+      otel-collector:
+        condition: service_started
+      seq:
+        condition: service_started
+      catalog-api:
+        condition: service_healthy
+      ordering-api:
+        condition: service_healthy
 
   integration-worker:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/integration-worker:${DADMAN_IMAGE_TAG:-dev}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.dotnet
@@ -125,6 +162,9 @@ services:
       Auth__SigningKey: ${AUTH_SIGNING_KEY}
       Seq__ServerUrl: http://seq:80
     depends_on:
-      - rabbitmq
-      - otel-collector
-      - seq
+      rabbitmq:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      seq:
+        condition: service_started

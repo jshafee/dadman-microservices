@@ -1,0 +1,136 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  rabbitmq:
+    image: rabbitmq:3.13.7-management
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    logging: *default-logging
+
+  seq:
+    image: datalust/seq:2024.3
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    logging: *default-logging
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    logging: *default-logging
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.61.0
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    logging: *default-logging
+
+  redis:
+    image: redis:7.4.1-alpine
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    logging: *default-logging
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    logging: *default-logging
+
+  catalog-api:
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
+    logging: *default-logging
+
+  ordering-api:
+    restart: unless-stopped
+    ports: []
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
+    logging: *default-logging
+
+  catalog-migrator:
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
+
+  ordering-migrator:
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
+
+  gateway-api:
+    restart: unless-stopped
+    ports:
+      - "5100:8080"
+    networks:
+      - public
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
+    logging: *default-logging
+
+  integration-worker:
+    restart: unless-stopped
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
+    logging: *default-logging
+
+networks:
+  public:
+    name: dadman-public
+  private:
+    name: dadman-private
+    internal: true
