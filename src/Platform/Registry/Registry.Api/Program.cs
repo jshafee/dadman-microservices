@@ -16,7 +16,14 @@ app.UseAuthentication();
 app.UsePlatformScopeContext();
 app.UseAuthorization();
 
-app.MapGet("/api/platform-registry/v1/_ping", (IScopeContext scope) => Results.Ok(new { scope.TenantId, scope.ApplicationId, scope.PrincipalId, scope.CorrelationId, scope.CausationId })).RequireAuthorization();
+app.MapGet("/api/platform-registry/v1/_ping", (IScopeContext scope) => Results.Ok(new
+{
+    service = "registry-api",
+    tenantId = scope.TenantId,
+    applicationId = scope.ApplicationId,
+    principalId = scope.PrincipalId,
+    correlationId = scope.CorrelationId
+})).RequireAuthorization();
 
 app.Run();
 

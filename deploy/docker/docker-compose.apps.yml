@@ -107,6 +107,37 @@ services:
       sqlserver:
         condition: service_healthy
 
+
+  registry-migrator:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/registry-migrator:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Tools/Registry.Migrator/Registry.Migrator.csproj
+    command: ["Registry.Migrator.dll"]
+    environment:
+      ConnectionStrings__RegistryDb: Server=sqlserver,1433;Database=RegistryDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      Seq__ServerUrl: http://seq:80
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  iam-migrator:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/iam-migrator:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Tools/Iam.Migrator/Iam.Migrator.csproj
+    command: ["Iam.Migrator.dll"]
+    environment:
+      ConnectionStrings__IamDb: Server=sqlserver,1433;Database=IamDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      Seq__ServerUrl: http://seq:80
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
   gateway-api:
     image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/gateway-api:${DADMAN_IMAGE_TAG:-dev}
     build:
@@ -122,6 +153,13 @@ services:
       Auth__SigningKey: ${AUTH_SIGNING_KEY}
       ReverseProxy__Clusters__catalog-cluster__Destinations__catalog__Address: http://catalog-api:8080
       ReverseProxy__Clusters__ordering-cluster__Destinations__ordering__Address: http://ordering-api:8080
+      ReverseProxy__Clusters__platform-registry-cluster__Destinations__registry__Address: http://registry-api:8080
+      ReverseProxy__Clusters__iam-cluster__Destinations__iam__Address: http://iam-api:8080
+      ReverseProxy__Clusters__org-cluster__Destinations__org__Address: http://org-api:8080
+      ReverseProxy__Clusters__document-cluster__Destinations__document__Address: http://document-api:8080
+      ReverseProxy__Clusters__workflow-cluster__Destinations__workflow__Address: http://workflow-api:8080
+      ReverseProxy__Clusters__audit-cluster__Destinations__audit__Address: http://audit-api:8080
+      ReverseProxy__Clusters__notification-cluster__Destinations__notification__Address: http://notification-api:8080
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       Seq__ServerUrl: http://seq:80
       REDIS_CONNECTIONSTRING: ${REDIS_CONNECTIONSTRING}
@@ -189,6 +227,8 @@ services:
     ports: ["5201:8080"]
     depends_on:
       sqlserver: { condition: service_healthy }
+      otel-collector: { condition: service_started }
+      seq: { condition: service_started }
 
   iam-api:
     image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/iam-api:${DADMAN_IMAGE_TAG:-dev}
@@ -209,6 +249,8 @@ services:
     ports: ["5202:8080"]
     depends_on:
       sqlserver: { condition: service_healthy }
+      otel-collector: { condition: service_started }
+      seq: { condition: service_started }
 
   org-api:
     image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/org-api:${DADMAN_IMAGE_TAG:-dev}

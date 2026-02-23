@@ -30,6 +30,10 @@ All events are integration events published via message bus with outbox reliabil
 - Envelope is carried in message payload as wrapper contract.
 - Broker/transport headers may duplicate correlation fields for diagnostics only.
 
+**Scope field requirement note**
+- `tenantId` and `applicationId` are REQUIRED for tenant/application scoped domain events.
+- Registry/global lifecycle events (for example `platform.registry.tenant.registered.v1` and `platform.registry.application.registered.v1`) may omit `tenantId` or `applicationId` when that scope is not yet applicable.
+
 ## Platform Registry Events
 
 ### 0.1) `platform.registry.tenant.registered.v1`
