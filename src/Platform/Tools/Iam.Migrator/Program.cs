@@ -1,15 +1,21 @@
 using BuildingBlocks.Scoping;
-using Microsoft.EntityFrameworkCore;
 using Iam.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
-const string ConnectionStringVariableName = "ConnectionStrings__IamDb";
 const int MaxAttempts = 20;
 var delay = TimeSpan.FromSeconds(3);
 
-var connectionString = Environment.GetEnvironmentVariable(ConnectionStringVariableName);
+var configuration = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json", optional: true)
+    .AddEnvironmentVariables()
+    .AddKeyPerFile("/run/secrets", optional: true)
+    .Build();
+
+var connectionString = configuration.GetConnectionString("IamDb") ?? configuration["ConnectionStrings:IamDb"];
 if (string.IsNullOrWhiteSpace(connectionString))
 {
-    Console.Error.WriteLine($"Missing required environment variable '{ConnectionStringVariableName}'.");
+    Console.Error.WriteLine("Missing connection string for IamDb.");
     return 1;
 }
 

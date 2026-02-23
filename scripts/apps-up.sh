@@ -30,7 +30,7 @@ echo "Building app images..."
 docker compose \
   "${compose_files[@]}" \
   --env-file deploy/docker/.env \
-  build catalog-api ordering-api gateway-api integration-worker catalog-migrator ordering-migrator
+  build catalog-api ordering-api registry-api iam-api gateway-api integration-worker catalog-migrator ordering-migrator registry-migrator iam-migrator
 
 echo "Running Catalog migrations..."
 docker compose "${compose_files[@]}" --env-file deploy/docker/.env run --rm catalog-migrator
@@ -38,8 +38,14 @@ docker compose "${compose_files[@]}" --env-file deploy/docker/.env run --rm cata
 echo "Running Ordering migrations..."
 docker compose "${compose_files[@]}" --env-file deploy/docker/.env run --rm ordering-migrator
 
+echo "Running Registry migrations..."
+docker compose "${compose_files[@]}" --env-file deploy/docker/.env run --rm registry-migrator
+
+echo "Running IAM migrations..."
+docker compose "${compose_files[@]}" --env-file deploy/docker/.env run --rm iam-migrator
+
 echo "Starting app services..."
-docker compose "${compose_files[@]}" --env-file deploy/docker/.env up -d catalog-api ordering-api gateway-api integration-worker
+docker compose "${compose_files[@]}" --env-file deploy/docker/.env up -d catalog-api ordering-api registry-api iam-api gateway-api integration-worker
 
 echo "Infra + app stack is up (migrations applied)."
 if [[ "$prod_mode" == "true" ]]; then

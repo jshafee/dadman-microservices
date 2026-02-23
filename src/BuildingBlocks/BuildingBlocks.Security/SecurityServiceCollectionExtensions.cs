@@ -41,6 +41,7 @@ public static class SecurityServiceCollectionExtensions
             options.AddPolicy(SecurityPolicies.CatalogWrite, policy => policy.RequireAuthenticatedUser().RequireScope(SecurityPolicies.CatalogWrite));
             options.AddPolicy(SecurityPolicies.OrderingRead, policy => policy.RequireAuthenticatedUser().RequireScope(SecurityPolicies.OrderingRead));
             options.AddPolicy(SecurityPolicies.OrderingWrite, policy => policy.RequireAuthenticatedUser().RequireScope(SecurityPolicies.OrderingWrite));
+            options.AddPolicy(SecurityPolicies.Authenticated, policy => policy.RequireAuthenticatedUser());
         });
 
         return services;

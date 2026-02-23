@@ -95,11 +95,37 @@ All published events include:
 - `actor` (`userId` or `servicePrincipalId`)
 - `producer.service`, `producer.instanceId`
 
+Standard envelope example:
+```json
+{
+  "eventId": "uuid",
+  "eventType": "platform.<context>.<event>.v1",
+  "version": 1,
+  "occurredAtUtc": "2026-01-01T12:00:00Z",
+  "tenantId": "uuid",
+  "applicationId": "uuid",
+  "correlationId": "uuid",
+  "causationId": "uuid",
+  "actor": {
+    "type": "user|servicePrincipal|system",
+    "id": "uuid|string"
+  },
+  "producer": {
+    "service": "string",
+    "instanceId": "string"
+  },
+  "payload": {}
+}
+```
+
+The standard envelope contract is incomplete without both producer metadata fields (`producer.service` and `producer.instanceId`).
+
 Canonical mapping choice:
 - Scope and identity fields are part of event wrapper payload (not headers-only contracts).
 - MassTransit consumers set `IScopeContext` via a shared consume filter reading the wrapper envelope.
 
 Consumers MUST:
+- Exception: registry/global lifecycle events may omit `tenantId` or `applicationId` when those scopes are being defined by the event itself.
 - Validate scope presence.
 - Enforce scoped writes in inbox handler.
 - Reject/park messages with missing or invalid scope metadata.

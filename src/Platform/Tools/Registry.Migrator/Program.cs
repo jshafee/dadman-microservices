@@ -1,14 +1,20 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Registry.Infrastructure;
 
-const string ConnectionStringVariableName = "ConnectionStrings__RegistryDb";
 const int MaxAttempts = 20;
 var delay = TimeSpan.FromSeconds(3);
 
-var connectionString = Environment.GetEnvironmentVariable(ConnectionStringVariableName);
+var configuration = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json", optional: true)
+    .AddEnvironmentVariables()
+    .AddKeyPerFile("/run/secrets", optional: true)
+    .Build();
+
+var connectionString = configuration.GetConnectionString("RegistryDb") ?? configuration["ConnectionStrings:RegistryDb"];
 if (string.IsNullOrWhiteSpace(connectionString))
 {
-    Console.Error.WriteLine($"Missing required environment variable '{ConnectionStringVariableName}'.");
+    Console.Error.WriteLine("Missing connection string for RegistryDb.");
     return 1;
 }
 

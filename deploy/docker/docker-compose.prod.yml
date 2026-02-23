@@ -105,6 +105,23 @@ services:
         DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
         DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
 
+
+  registry-migrator:
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
+
+  iam-migrator:
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
+
   gateway-api:
     restart: unless-stopped
     ports:
@@ -131,17 +148,25 @@ services:
 
 
   registry-api:
-    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/registry-api:${DADMAN_IMAGE_TAG:-prod}
     restart: unless-stopped
     ports: []
-    networks: [private]
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
     logging: *default-logging
 
   iam-api:
-    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/iam-api:${DADMAN_IMAGE_TAG:-prod}
     restart: unless-stopped
     ports: []
-    networks: [private]
+    networks:
+      - private
+    build:
+      args:
+        DOTNET_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0.100
+        DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
     logging: *default-logging
 
   org-api:
