@@ -128,6 +128,57 @@ services:
         DOTNET_ASPNET_IMAGE: mcr.microsoft.com/dotnet/aspnet:10.0.0
     logging: *default-logging
 
+
+
+  registry-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/registry-api:${DADMAN_IMAGE_TAG:-prod}
+    restart: unless-stopped
+    ports: []
+    networks: [private]
+    logging: *default-logging
+
+  iam-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/iam-api:${DADMAN_IMAGE_TAG:-prod}
+    restart: unless-stopped
+    ports: []
+    networks: [private]
+    logging: *default-logging
+
+  org-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/org-api:${DADMAN_IMAGE_TAG:-prod}
+    restart: unless-stopped
+    ports: []
+    networks: [private]
+    logging: *default-logging
+
+  document-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/document-api:${DADMAN_IMAGE_TAG:-prod}
+    restart: unless-stopped
+    ports: []
+    networks: [private]
+    logging: *default-logging
+
+  workflow-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/workflow-api:${DADMAN_IMAGE_TAG:-prod}
+    restart: unless-stopped
+    ports: []
+    networks: [private]
+    logging: *default-logging
+
+  audit-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/audit-api:${DADMAN_IMAGE_TAG:-prod}
+    restart: unless-stopped
+    ports: []
+    networks: [private]
+    logging: *default-logging
+
+  notification-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/notification-api:${DADMAN_IMAGE_TAG:-prod}
+    restart: unless-stopped
+    ports: []
+    networks: [private]
+    logging: *default-logging
+
 networks:
   public:
     name: dadman-public

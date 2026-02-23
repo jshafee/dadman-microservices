@@ -168,3 +168,144 @@ services:
         condition: service_started
       seq:
         condition: service_started
+
+
+  registry-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/registry-api:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Registry/Registry.Api/Registry.Api.csproj
+    command: ["Registry.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__RegistryDb: Server=sqlserver,1433;Database=RegistryDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    ports: ["5201:8080"]
+    depends_on:
+      sqlserver: { condition: service_healthy }
+
+  iam-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/iam-api:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Iam/Iam.Api/Iam.Api.csproj
+    command: ["Iam.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__IamDb: Server=sqlserver,1433;Database=IamDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    ports: ["5202:8080"]
+    depends_on:
+      sqlserver: { condition: service_healthy }
+
+  org-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/org-api:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Org/Org.Api/Org.Api.csproj
+    command: ["Org.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__OrgDb: Server=sqlserver,1433;Database=OrgDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    ports: ["5203:8080"]
+    depends_on:
+      sqlserver: { condition: service_healthy }
+
+  document-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/document-api:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Document/Document.Api/Document.Api.csproj
+    command: ["Document.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__DocumentDb: Server=sqlserver,1433;Database=DocumentDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    ports: ["5204:8080"]
+    depends_on:
+      sqlserver: { condition: service_healthy }
+
+  workflow-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/workflow-api:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Workflow/Workflow.Api/Workflow.Api.csproj
+    command: ["Workflow.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__WorkflowDb: Server=sqlserver,1433;Database=WorkflowDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    ports: ["5205:8080"]
+    depends_on:
+      sqlserver: { condition: service_healthy }
+
+  audit-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/audit-api:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Audit/Audit.Api/Audit.Api.csproj
+    command: ["Audit.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__AuditDb: Server=sqlserver,1433;Database=AuditDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    ports: ["5206:8080"]
+    depends_on:
+      sqlserver: { condition: service_healthy }
+
+  notification-api:
+    image: ghcr.io/${GHCR_OWNER:-local}/${GHCR_REPOSITORY:-dadman-microservices-backend}/notification-api:${DADMAN_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.dotnet
+      args:
+        PROJECT: src/Platform/Notification/Notification.Api/Notification.Api.csproj
+    command: ["Notification.Api.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__NotificationDb: Server=sqlserver,1433;Database=NotificationDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=true
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      Auth__Issuer: ${AUTH_ISSUER}
+      Auth__Audience: ${AUTH_AUDIENCE}
+      Auth__SigningKey: ${AUTH_SIGNING_KEY}
+      Seq__ServerUrl: http://seq:80
+    ports: ["5207:8080"]
+    depends_on:
+      sqlserver: { condition: service_healthy }

@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\..\Platform\Org\Org.Infrastructure\Org.Infrastructure.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" /></ItemGroup>
+</Project>

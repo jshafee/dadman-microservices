@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Workflow.Contracts\Workflow.Contracts.csproj" />
+    <ProjectReference Include="..\Workflow.Domain\Workflow.Domain.csproj" />
+  </ItemGroup>
+</Project>
